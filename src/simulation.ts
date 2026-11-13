@@ -82,7 +82,7 @@ if(!avoiding && c.target !== null){let i=foods.findIndex(f=>f.id===c.target);if(
 if(!avoiding && index===-1){for(let i=0;i<foods.length;i++){let d=distance(c,foods[i]);if(d<best){best=d;index=i}}}
 if(index>=0){
 const f=foods[index];c.target=f.id;
-if(best<49){
+if(best<Math.max(7,radius(c))**2){
 const previousRadius=radius(c);
 foods.splice(index,1);c.target=null;c.eaten++;c.flash=.5;
 if(c.eaten>100){c.alive=false;continue}
