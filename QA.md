@@ -8,6 +8,8 @@ Fix: render-state.js giữ bản sao trình bày, nội suy các vị trí đã 
 
 PASS local: 26/26 automated tests, typecheck và build. Browser test xác nhận >20 lần vẽ trong 1,2 giây khi vẫn nhận snapshot ~2Hz; F5/shared-world/reconnect/admin vẫn PASS. Cùng backend production, frontend local sau sửa đo 452 draw / 16 snapshot trong 8,01 giây (~56,4 draw/s), median gap 501,1ms/max 506,6ms, không long task/browser error. Đây là draw cadence trên Chromium headless, không phải benchmark mọi thiết bị/GPU hoặc database. Probe chỉ đọc, không gửi admin actions. Script tái lập: node scripts/profile-render.mjs; PROFILE_URL chọn frontend, PROFILE_BACKEND tùy chọn cấu hình Worker cho frontend local.
 
+PASS production sau frontend-only deployment `312a7b27` (source `2954363`): 443 draw / 15 snapshot trong 8,015 giây (~55,27 draw/s), median snapshot gap 501,4ms/max 669,2ms, ~37,5KB/s, 0 long tasks và 0 browser errors. `npm run verify:production` PASS lại: F5/shared canonical world/read-only controls. Không thay đổi/deploy lại Worker hoặc database. Lượt đo 8 giây xác nhận xử lý nguyên nhân vẽ 2Hz, không phải cam kết FPS trên mọi thiết bị hoặc mạng.
+
 ## Triển khai ban đầu
 
 Phạm vi: Windows PowerShell, Node 22.16, Wrangler 4.161.0, workerd/Miniflare SQLite và Chromium; bổ sung deployment và smoke production sau khi người dùng phê duyệt. Baseline: `d0d6f8e`.

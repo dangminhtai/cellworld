@@ -5,7 +5,8 @@
 - [x] Profile production read-only for 8 seconds: 16 draws / 16 snapshots (1.995 draws/s), median snapshot gap 500.1ms, maximum 505.9ms, ~39.6KB/s, no long tasks, 100 alive cells. Canvas only drew on WebSocket messages.
 - [x] Implement client-only interpolation + requestAnimationFrame; preserve all authoritative rules/state. Pause/reset/recovery snap; stop frame loop when settled or hidden.
 - [x] Verify rendering, immutable authoritative state, F5/shared state, typecheck and build: 26/26 tests PASS. Local frontend + the same production backend produced 452 draws / 16 snapshots in 8.01s (~56.4 draws/s), no long tasks or browser errors.
-- [ ] Commit/push and deploy frontend-only remediation within the user-approved CELLWORLD deployment scope. Keep Worker, database and canonical world unchanged; verify production after deploy.
+- [x] Commit/push 2954363 and deploy frontend-only remediation within the user-approved CELLWORLD deployment scope: https://312a7b27.cellworld.pages.dev . Worker/database/canonical world unchanged.
+- [x] Production follow-up: 443 draws / 15 snapshots in 8.015s (~55.27 draws/s), median snapshot gap 501.4ms, no long tasks/browser errors. Production F5/shared-world verification PASS again.
 
 ## Initial implementation
 

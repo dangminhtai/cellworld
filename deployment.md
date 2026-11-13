@@ -1,5 +1,13 @@
 # Production CELLWORLD
 
+## Sửa chuyển động giật (frontend)
+
+Frontend-only deployment: https://312a7b27.cellworld.pages.dev ; production alias vẫn https://cellworld.pages.dev/ . Source commit `2954363`. Đã chạy `npm.cmd run deploy:frontend -- -ApproveProduction` để khắc phục lỗi của đợt triển khai được người dùng phê duyệt; 26/26 tests, typecheck, build và preflight đều PASS. Không deploy lại backend, không sửa state hoặc schema.
+
+Nguyên nhân được đo: bản trước Canvas chỉ vẽ khi nhận snapshot (~2Hz), nên giật dù snapshot đến đều khoảng 500ms. Bản mới nội suy vị trí đã nhận bằng requestAnimationFrame, không tự chạy simulation và không tăng nhịp ghi/broadcast server. Production probe sau sửa: ~55,27 draw/s (443 draw trong 8,015s), 15 snapshot, không long task/browser error. F5 và hai trang cùng world PASS lại. Xem QA.md cho số đo trước/sau và giới hạn.
+
+## Triển khai đầu tiên
+
 Người dùng đã phê duyệt deploy trong hội thoại. Kiểm tra Cloudflare trước deployment: đúng account đã đăng nhập, Pages chỉ có choicungnhau; Pages cellworld và Worker cellworld-backend đều chưa tồn tại. Project cellworld trong ảnh là Firebase, không phải Cloudflare Pages. Không thay đổi Firebase hoặc choicungnhau.
 
 ## Kết quả thực tế
