@@ -84,7 +84,7 @@ function reproduce(s:World,a:Cell,b:Cell){
   const px=clamp(x+20*Math.cos(angle*Math.PI/4),6,W-6);
   const py=clamp(y+20*Math.sin(angle*Math.PI/4),6,H-6);
   if(s.cells.some(c=>c.alive&&distance(c,{x:px,y:py})<(radius(c)+4)**2))continue;
-  s.cells.push({id:s.cells.at(-1)!.id+1,sex:rand(s)<0.5?'male':'female',x:px,y:py,
+  s.cells.push({id:s.nextCell===undefined?s.cells.at(-1)!.id+1:s.nextCell++,sex:rand(s)<0.5?'male':'female',x:px,y:py,
    direction:rand(s,-Math.PI,Math.PI),velocity:rand(s,18,33),turnIn:rand(s,1.5,5.5),
    target:null,eaten:0,alive:true,flash:0});
   return;
@@ -129,8 +129,9 @@ const makeFood=()=>food(s);
 t+=dt;debt+=5*rate*dt;
 while(debt>=1){if(foods.length<MAXFOODS)foods.push(makeFood());debt--}
 const contacts=s.contacts??={};
+const byId=new Map(cells.map(c=>[c.id,c]));
 for(const [key,[a,b]] of Object.entries(contacts)){
- const first=s.cells[a-1],second=s.cells[b-1];
+ const first=byId.get(a),second=byId.get(b);
  if(!first?.alive||!second?.alive||distance(first,second)>(radius(first)+radius(second)+0.001)**2)delete contacts[key];
 }
 const encounters:[Cell,Cell][]=[];

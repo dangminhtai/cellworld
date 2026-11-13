@@ -20,10 +20,18 @@ export class WorldObject extends DurableObject<Env> {
   private snapshot(compact=false){
     const world=this.world;
     const cells=compact?world.cells.filter(c=>c.alive||c.id<=100):world.cells;
-    return {type:'snapshot',world:compact?{...world,cells,contacts:undefined,deadCount:world.cells.length-world.cells.filter(c=>c.alive).length}:world,recoveryMs:Math.max(0,Date.now()-this.world.wall),recovering:this.recovering};}
+    return {type:'snapshot',world:compact?{...world,cells,contacts:undefined,deadCount:(world.archivedDeaths??0)+world.cells.length-world.cells.filter(c=>c.alive).length}:world,recoveryMs:Math.max(0,Date.now()-this.world.wall),recovering:this.recovering};}
   private broadcast(){const msg=JSON.stringify(this.snapshot(true));for(const ws of this.ctx.getWebSockets()){try{ws.send(msg)}catch{ws.close(1011,'Resync');}}}
+  private archiveDeaths(){
+    const world=this.world;
+    world.nextCell??=(world.cells.at(-1)?.id??0)+1;
+    const cells=world.cells.filter(c=>c.alive||c.id<=100);
+    world.archivedDeaths=(world.archivedDeaths??0)+world.cells.length-cells.length;
+    world.cells=cells;
+  }
   private async cycle(){
     const target=Date.now();
+    this.archiveDeaths();
     ensureMonster(this.world);
     // Scale the catch-up allowance while bounding each alarm cycle.
     const remaining=advance(this.world,target,100,Math.min(80,8*this.world.speed));
