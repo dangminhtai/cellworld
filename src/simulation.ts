@@ -72,7 +72,7 @@ return s;
 function reproduce(s:World,a:Cell,b:Cell){
  if(!a.alive||!b.alive||sex(a)===sex(b))return;
  const dead=s.cells.filter(c=>!c.alive).length;
- if(s.cells.length-dead>=100-Math.floor(dead/5)||rand(s)>=0.5)return;
+ if(s.cells.length-dead>=N||rand(s)>=0.5)return;
  const x=(a.x+b.x)/2,y=(a.y+b.y)/2;
  for(let angle=0;angle<8;angle++){
   const px=clamp(x+20*Math.cos(angle*Math.PI/4),6,W-6);
