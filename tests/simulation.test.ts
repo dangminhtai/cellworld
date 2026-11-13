@@ -77,7 +77,7 @@ test('fresh contact can produce one child and the declining cap blocks replaceme
   Object.assign(a,{x:100,y:100,direction:0,velocity:30,turnIn:3});
   Object.assign(b,{x:108,y:100,velocity:0,turnIn:3});
   s.cells.slice(2).forEach((c,i)=>Object.assign(c,{x:250+(i%10)*50,y:50+Math.floor(i/10)*50,velocity:0,alive:i>=deaths}));
-  s.seed=1;s.rate=0;
+  s.seed=2;s.rate=0;
   // Keep the living population one below 100 in both scenarios.
   if(deaths===5)for(let i=0;i<4;i++)s.cells.push({...s.cells[7+i],id:101+i,y:570});
   tick(s);
