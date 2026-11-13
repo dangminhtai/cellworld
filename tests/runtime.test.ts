@@ -54,7 +54,7 @@ test('workerd: all controls public, validation, CORS, shared state and durable r
   await mf.dispose();mf=new Miniflare(options);const ns=await mf.getDurableObjectNamespace('WORLD');const saved=structuredClone(before.world) as World;saved.running=true;saved.wall=Date.now()-86400000;await(ns.get(ns.idFromName('canonical-world-v1')) as any).seedWorld(saved);await mf.dispose();mf=new Miniflare(options);
   await t.test('bounded day-long recovery persists across interruption and blocks premature controls',async()=>{
    const a=await get();assert.ok(a.recoveryMs>86000000);assert.ok(a.world.wall-saved.wall<=10000);
-   await mf.dispose();mf=new Miniflare(options);const b=await get();assert.ok(b.world.wall>a.world.wall);assert.ok(b.world.t>a.world.t);assert.equal(b.world.generation,saved.generation);assert.equal(b.world.cells.length,100);assert.equal((await send({type:'reset'})).status,409);
+   await mf.dispose();mf=new Miniflare(options);const b=await get();assert.ok(b.world.wall>a.world.wall);assert.ok(b.world.t>a.world.t);assert.equal(b.world.generation,saved.generation);assert.deepEqual(b.world.cells.slice(0,saved.cells.length).map(c=>c.id),saved.cells.map(c=>c.id));assert.ok(b.world.cells.filter(c=>c.alive).length<=100);assert.equal((await send({type:'reset'})).status,409);
   });
  }finally{await mf.dispose();await rm(dir,{recursive:true,force:true});}
 });
