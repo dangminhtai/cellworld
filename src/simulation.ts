@@ -12,13 +12,20 @@ function separate(c:Cell, cells:Cell[]){
  const fits=(x:number,y:number)=>cells.every(other=>other===c||!other.alive||
   (x-other.x)**2+(y-other.y)**2>=(r+radius(other))**2);
  if(fits(c.x,c.y))return;
- for(let offset=1;;offset++){
+ for(let offset=1;offset<=40;offset++){
   for(let angle=0;angle<8;angle++){
    const x=clamp(c.x+offset*Math.cos(angle*Math.PI/4),margin,W-margin);
    const y=clamp(c.y+offset*Math.sin(angle*Math.PI/4),margin,H-margin);
    if(fits(x,y)){c.x=x;c.y=y;return;}
   }
  }
+ // A crowded or legacy position can block every sampled direction.
+ for(let y=margin;y<=H-margin;y+=20){
+  for(let x=margin;x<=W-margin;x+=20){
+   if(fits(x,y)){c.x=x;c.y=y;return;}
+  }
+ }
+
 }
 
 function move(c:Cell,cells:Cell[],dt:number,onContact:(other:Cell)=>void){
@@ -71,8 +78,7 @@ return s;
 }
 function reproduce(s:World,a:Cell,b:Cell){
  if(!a.alive||!b.alive||sex(a)===sex(b))return;
- const dead=s.cells.filter(c=>!c.alive).length;
- if(s.cells.length-dead>=N||rand(s)>=0.5)return;
+ if(s.cells.filter(c=>c.alive).length>=N||rand(s)>=0.5)return;
  const x=(a.x+b.x)/2,y=(a.y+b.y)/2;
  for(let angle=0;angle<8;angle++){
   const px=clamp(x+20*Math.cos(angle*Math.PI/4),6,W-6);
@@ -116,14 +122,15 @@ function moveMonster(s:World,dt:number){
 }
 
 export function tick(s: World, dt = 1/30){
-let {cells, foods, rate, debt, t} = s;
+let {foods, rate, debt, t} = s;
+const cells=s.cells.filter(c=>c.alive);
 const random=(a=0,b=1)=>rand(s,a,b);
 const makeFood=()=>food(s);
 t+=dt;debt+=5*rate*dt;
 while(debt>=1){if(foods.length<MAXFOODS)foods.push(makeFood());debt--}
 const contacts=s.contacts??={};
 for(const [key,[a,b]] of Object.entries(contacts)){
- const first=cells[a-1],second=cells[b-1];
+ const first=s.cells[a-1],second=s.cells[b-1];
  if(!first?.alive||!second?.alive||distance(first,second)>(radius(first)+radius(second)+0.001)**2)delete contacts[key];
 }
 const encounters:[Cell,Cell][]=[];

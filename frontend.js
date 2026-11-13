@@ -26,7 +26,7 @@ function controls(){
 const connected=socket?.readyState===WebSocket.OPEN&&!recovering;
 document.querySelectorAll('.controls button,.controls input').forEach(b=>b.disabled=!connected);
 $("step").disabled=!connected||world?.running;
-if(world){$("pause").textContent=world.running?'⏸ Tạm dừng':'▶ Tiếp tục';if(!editingRate){$("rate").value=world.rate*100;$("rateLabel").textContent=Math.round(world.rate*100)+'%';}document.querySelectorAll('.speed').forEach(b=>b.classList.toggle('active',Number(b.dataset.speed)===world.speed));}
+if(world){$("pause").textContent=world.running?'⏸ Tạm dừng':'▶ Tiếp tục';if(!editingRate){$("rate").value=world.rate*100;$("rateLabel").textContent=Math.round(world.rate*100)+'%';}document.querySelectorAll('.speed').forEach(b=>{b.classList.toggle('active',Number(b.dataset.speed)===world.speed);if(recovering&&socket?.readyState===WebSocket.OPEN)b.disabled=Number(b.dataset.speed)>=world.speed;});}
 }
 async function command(value){
 const version=commandVersion[value.type]=(commandVersion[value.type]||0)+1;

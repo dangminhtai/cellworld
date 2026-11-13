@@ -46,7 +46,9 @@ export class WorldObject extends DurableObject<Env> {
         // Compare against the fixed entry timestamp, not a newer timestamp after
         // storage I/O; otherwise a completed quantum can spuriously become stale.
         const remaining=await this.cycle();
-        if(remaining>=100)return new Response('Recovery in progress; retry after synchronization',{status:409});
+        const command=value as {type?:string;value?:number}|null;
+        const loweringSpeed=command?.type==='speed' && typeof command.value==='number' && command.value<this.world.speed;
+        if(remaining>=100&&!loweringSpeed)return new Response('Recovery in progress; retry after synchronization',{status:409});
         try{this.world=action(this.world,value);ensureMonster(this.world);}catch{return new Response('Invalid action',{status:400});}
         await this.ctx.storage.put('world',this.world);this.broadcast();return Response.json({revision:this.world.revision});
       }
