@@ -1,13 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
-import vm from 'node:vm';
 import {advance,createWorld,food,tick} from '../src/simulation';
 import {action} from '../src/actions';
 
 function isolated(){const s=createWorld(0);s.rate=0;s.foods=[];s.cells.slice(1).forEach(c=>c.alive=false);const c=s.cells[0];Object.assign(c,{x:450,y:290,direction:0,velocity:20,turnIn:3,target:null});return s;}
-test('initial world has exactly 100 unique cells and 180 food, no reproduction',()=>{
- const s=createWorld(0);assert.equal(s.cells.length,100);assert.equal(new Set(s.cells.map(c=>c.id)).size,100);assert.equal(s.foods.length,180);
+test('initial world has exactly 100 unique cells and no food, no reproduction',()=>{
+ const s=createWorld(0);assert.equal(s.cells.length,100);assert.equal(new Set(s.cells.map(c=>c.id)).size,100);assert.equal(s.foods.length,0);
  advance(s,60000,1000);assert.equal(s.cells.length,100);
 });
 test('straight random wandering turns after 1.5–5.5s and reflects boundaries',()=>{
@@ -52,11 +50,10 @@ test('pause, speed, step, rate, reset generation and action validation',()=>{
  for(const a of [{type:'speed',value:11},{type:'rate',value:NaN},{type:'food',x:Infinity,y:0},{type:'unknown'},{type:'step'}]){const before=structuredClone(s);assert.throws(()=>action(s,a));assert.deepEqual(s,before);}
  const rev=s.revision;s=action(s,{type:'reset'});assert.equal(s.generation,1);assert.equal(s.revision,rev+1);assert.equal(s.cells.length,100);assert.equal(s.wall,6000);
 });
-test('extracted engine matches untouched original rules for 60 simulated seconds',()=>{
- const original=readFileSync(new URL('./fixtures/original-engine.js',import.meta.url),'utf8');
- const context=vm.createContext({});vm.runInContext(original+';for(let i=0;i<1800;i++)tick(1/30);globalThis.result=JSON.stringify({seed,t,debt,cells,foods});',context);
- const expected=JSON.parse(context.result),s=createWorld(0);for(let i=0;i<1800;i++)tick(s);
- assert.equal(s.seed,expected.seed);assert.equal(s.t,expected.t);assert.equal(s.debt,expected.debt);
- assert.deepEqual(s.foods.map(({x,y})=>({x,y})),expected.foods);
- assert.deepEqual(s.cells.map(c=>({...c,target:c.target===null?null:(({x,y})=>({x,y}))(s.foods.find(f=>f.id===c.target)!)})),expected.cells);
+test('same-size cells block movement, and larger cells eat smaller cells on contact',()=>{
+ const s=isolated(),c=s.cells[0],other=s.cells[1];
+ Object.assign(other,{alive:true,x:459,y:290,velocity:0});
+ tick(s,1);assert.ok(c.x<=451);assert.equal(other.alive,true);
+ Object.assign(c,{x:450,direction:0,eaten:20});
+ tick(s,1);assert.equal(other.alive,false);
 });

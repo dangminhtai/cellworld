@@ -57,9 +57,9 @@ for(let y=0;y<H;y+=45){ctx.moveTo(0,y);ctx.lineTo(W,y)}ctx.stroke();
 ctx.fillStyle="#e2e9a2";for(const f of foods)ctx.fillRect(f.x-1.5,f.y-1.5,3,3);
 for(const c of renderedCells){
 if(!c.alive)continue;
-ctx.fillStyle=c.flash>0?"#f7eb8e":c.eaten>=90?"#eb8585":c.eaten>=60?"#f3be83":"#81e2c5";
-ctx.globalAlpha=.16;ctx.beginPath();ctx.arc(c.x,c.y,9,0,Math.PI*2);ctx.fill();
-ctx.globalAlpha=1;ctx.beginPath();ctx.arc(c.x,c.y,4,0,Math.PI*2);ctx.fill();
+const radius=c.eaten>=60?6:c.eaten>=20?5:4;
+ctx.fillStyle=c.eaten>=60?"#eb6868":c.eaten>=20?"#f7eb8e":"#81e2a0";
+ctx.beginPath();ctx.arc(c.x,c.y,radius,0,Math.PI*2);ctx.fill();
 }
 const focus=renderedCells.find(c=>c.id===selectedId);
 if(focus){
@@ -73,7 +73,7 @@ const alive=cells.filter(c=>c.alive);
 $("alive").textContent=alive.length;$("dead").textContent=N-alive.length;$("foods").textContent=foods.length;
 $("average").textContent=alive.length?(alive.reduce((n,c)=>n+c.eaten,0)/alive.length).toFixed(1):"0";
 $("clock").textContent=String(Math.floor(t/60)).padStart(2,"0")+":"+String(Math.floor(t)%60).padStart(2,"0");
-if(selected)$("inspect").textContent="Tế bào #"+selected.id+" | "+(selected.alive?"Còn sống":"Đã chết")+" | Ăn "+selected.eaten+" hạt | Bán kính 90px"+(selected.alive?"":" | Chết ở hạt thứ 101");
+if(selected)$("inspect").textContent="Tế bào #"+selected.id+" | "+(selected.alive?"Còn sống":"Đã chết")+" | Ăn "+selected.eaten+" hạt | Bán kính 90px"+(selected.alive?"":"");
 }
 
 $("admin").onclick=async()=>{
