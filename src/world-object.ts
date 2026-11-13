@@ -20,8 +20,8 @@ export class WorldObject extends DurableObject<Env> {
   private broadcast(){const msg=JSON.stringify(this.snapshot());for(const ws of this.ctx.getWebSockets()){try{ws.send(msg)}catch{ws.close(1011,'Resync');}}}
   private async cycle(){
     const target=Date.now();
-    // Keep the same CPU allowance per simulated second when users select 10x.
-    const remaining=advance(this.world,target,100,8*this.world.speed);
+    // Scale the catch-up allowance while bounding each alarm cycle.
+    const remaining=advance(this.world,target,100,Math.min(80,8*this.world.speed));
     this.recovering=remaining>=100;
     await this.ctx.storage.put('world',this.world);
     if(this.ctx.getWebSockets().length || Date.now()-this.world.wall>=100)await this.ctx.storage.setAlarm(Date.now()+500);

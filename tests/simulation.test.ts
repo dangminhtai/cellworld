@@ -47,6 +47,7 @@ test('deterministic long catch-up resumes after every persisted batch and change
 test('pause, speed, step, rate, reset generation and action validation',()=>{
  let s=createWorld(0);action(s,{type:'pause',running:false});advance(s,5000);assert.equal(s.t,0);assert.equal(s.wall,5000);
  action(s,{type:'step'});assert.ok(Math.abs(s.t-1)<1e-10);action(s,{type:'speed',value:10});action(s,{type:'pause',running:true});advance(s,6000);assert.ok(Math.abs(s.t-11)<1e-9);
+ for(const speed of [50,100]){action(s,{type:"speed",value:speed});assert.equal(s.speed,speed);}
  for(const a of [{type:'speed',value:11},{type:'rate',value:NaN},{type:'food',x:Infinity,y:0},{type:'unknown'},{type:'step'}]){const before=structuredClone(s);assert.throws(()=>action(s,a));assert.deepEqual(s,before);}
  const rev=s.revision;s=action(s,{type:'reset'});assert.equal(s.generation,1);assert.equal(s.revision,rev+1);assert.equal(s.cells.length,100);assert.equal(s.wall,6000);
 });

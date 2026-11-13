@@ -2,28 +2,36 @@ import type { World, Food, Cell } from './types';
 export const W=900,H=585,N=100,MAXFOODS=700;
 export const clamp=(x:number,a:number,b:number)=>Math.min(b,Math.max(a,x));
 const distance=(a:{x:number;y:number},b:{x:number;y:number})=>(a.x-b.x)**2+(a.y-b.y)**2;
-const radius=(c:Cell)=>c.eaten>=60?6:c.eaten>=20?5:4;
+const radius=(c:Cell)=>c.eaten>=60?10:c.eaten>=20?5:4;
 
 function separate(c:Cell, cells:Cell[]){
  const r=radius(c);
+ const margin=Math.max(6,r);
+ c.x=clamp(c.x,margin,W-margin);
+ c.y=clamp(c.y,margin,H-margin);
  const fits=(x:number,y:number)=>cells.every(other=>other===c||!other.alive||
   (x-other.x)**2+(y-other.y)**2>=(r+radius(other))**2);
  if(fits(c.x,c.y))return;
  for(let offset=1;;offset++){
   for(let angle=0;angle<8;angle++){
-   const x=clamp(c.x+offset*Math.cos(angle*Math.PI/4),6,W-6);
-   const y=clamp(c.y+offset*Math.sin(angle*Math.PI/4),6,H-6);
+   const x=clamp(c.x+offset*Math.cos(angle*Math.PI/4),margin,W-margin);
+   const y=clamp(c.y+offset*Math.sin(angle*Math.PI/4),margin,H-margin);
    if(fits(x,y)){c.x=x;c.y=y;return;}
   }
  }
 }
 
 function move(c:Cell,cells:Cell[],dt:number){
+ const margin=Math.max(6,radius(c));
  const nextX=c.x+Math.cos(c.direction)*c.velocity*dt;
  const nextY=c.y+Math.sin(c.direction)*c.velocity*dt;
- const dx=clamp(nextX,6,W-6)-c.x,dy=clamp(nextY,6,H-6)-c.y;
+ const dx=clamp(nextX,margin,W-margin)-c.x,dy=clamp(nextY,margin,H-margin)-c.y;
  const lengthSquared=dx*dx+dy*dy;
- if(!lengthSquared)return;
+ if(!lengthSquared){
+  if(nextX<margin||nextX>W-margin)c.direction=Math.PI-c.direction;
+  if(nextY<margin||nextY>H-margin)c.direction=-c.direction;
+  return;
+ }
  let stop=1;
  let predatorAt=Infinity;
  const prey:{cell:Cell;at:number}[]=[];
@@ -46,8 +54,8 @@ function move(c:Cell,cells:Cell[],dt:number){
  c.x+=dx*stop;c.y+=dy*stop;
  if(stop<1)c.direction+=Math.PI;
  else {
-  if(nextX<6||nextX>W-6)c.direction=Math.PI-c.direction;
-  if(nextY<6||nextY>H-6)c.direction=-c.direction;
+  if(nextX<margin||nextX>W-margin)c.direction=Math.PI-c.direction;
+  if(nextY<margin||nextY>H-margin)c.direction=-c.direction;
  }
 }
 

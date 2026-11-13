@@ -5,7 +5,7 @@ export function action(s:World, value:unknown):World {
   const a=value as Record<string,unknown>;
   switch(a.type){
     case 'pause': if(typeof a.running!=='boolean')throw Error('running'); s.running=a.running; break;
-    case 'speed': if(![1,5,10].includes(a.value as number))throw Error('speed');s.speed=a.value as number;break;
+    case 'speed': if(![1,5,10,50,100].includes(a.value as number))throw Error('speed');s.speed=a.value as number;break;
     case 'rate': if(typeof a.value!=='number'||!Number.isFinite(a.value)||a.value<0||a.value>2)throw Error('rate');s.rate=a.value;break;
     case 'step': if(s.running)throw Error('Pause first');for(let i=0;i<30;i++)tick(s);break;
     case 'food':

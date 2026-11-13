@@ -59,13 +59,10 @@ socket.onerror=()=>socket.close();
 setInterval(()=>{if(socket?.readyState===WebSocket.OPEN&&lastMessage&&Date.now()-lastMessage>15000)socket.close();},5000);
 function draw(){
 ctx.fillStyle="#0c252b";ctx.fillRect(0,0,W,H);
-ctx.strokeStyle="rgba(129,222,186,.07)";ctx.beginPath();
-for(let x=0;x<W;x+=45){ctx.moveTo(x,0);ctx.lineTo(x,H)}
-for(let y=0;y<H;y+=45){ctx.moveTo(0,y);ctx.lineTo(W,y)}ctx.stroke();
-ctx.fillStyle="#e2e9a2";for(const f of foods)ctx.fillRect(f.x-1.5,f.y-1.5,3,3);
+ctx.fillStyle="#80c8ff";for(const f of foods)ctx.fillRect(f.x-1.5,f.y-1.5,3,3);
 for(const c of renderedCells){
 if(!c.alive)continue;
-const radius=c.eaten>=60?6:c.eaten>=20?5:4;
+const radius=c.eaten>=60?10:c.eaten>=20?5:4;
 ctx.fillStyle=c.eaten>=60?"#eb6868":c.eaten>=20?"#f7eb8e":"#81e2a0";
 ctx.beginPath();ctx.arc(c.x,c.y,radius,0,Math.PI*2);ctx.fill();
 }
