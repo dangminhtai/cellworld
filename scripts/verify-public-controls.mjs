@@ -14,9 +14,10 @@ const change=async(type,value)=>{
 };
 const original=await get();const browser=await chromium.launch({headless:true});
 let changedSpeed=false,changedRate=false;
+const diagnostics=[];
 try{
  const pages=[await browser.newPage(),await browser.newPage({viewport:{width:390,height:844}})];
- for(const page of pages){await page.goto('https://cellworld.pages.dev/');await page.waitForFunction(()=>document.querySelector('#network')?.textContent==='Đã kết nối');}
+ for(const page of pages){page.on('response',r=>{if(r.url().endsWith('/api/controls'))diagnostics.push({status:r.status(),body:r.request().postData()});});page.on('pageerror',e=>diagnostics.push({error:e.message}));await page.goto('https://cellworld.pages.dev/');await page.waitForFunction(()=>document.querySelector('#network')?.textContent==='Đã kết nối');}
  await pages[0].locator('.speed[data-speed="10"]').click();changedSpeed=true;
  for(const page of pages)await page.waitForFunction(()=>document.querySelector('.speed[data-speed="10"]')?.classList.contains('active'),{},{timeout:20000});
  await pages[1].locator('#rate').press('End');changedRate=true;
@@ -25,6 +26,7 @@ try{
  await pages[1].reload();await pages[1].waitForFunction(()=>document.querySelector('.speed[data-speed="10"]')?.classList.contains('active')&&document.querySelector('#rateLabel')?.textContent==='200%');
  for(const page of pages){assert.equal(await page.locator('#reset').isDisabled(),true);assert.equal(await page.locator('#pause').isDisabled(),true);}
  console.log('PASS live: unauthenticated desktop/mobile changed 10x and 200% food; both observed persisted shared settings after F5; pause/reset remain locked.');
+}catch(e){const s=await get();console.error(JSON.stringify({diagnostics,actual:{speed:s.speed,rate:s.rate,t:s.t,generation:s.generation}}));throw e;
 }finally{
  await browser.close();
  // Do not overwrite a different setting selected by another visitor meanwhile.

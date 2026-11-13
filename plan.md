@@ -5,7 +5,9 @@
 - [x] User requested anyone may use up to 10x speed and the food-spawn slider. These change the shared world; pause/step/reset/manual food stay admin-only.
 - [x] Add an allowlisted public endpoint with existing server validation, independent mutation rate limit and shared persistence/broadcast. Unlock only speed and rate controls in the frontend.
 - [x] Verify public changes across browsers/reload/restart, forbidden actions, invalid values and rate limits. Found transient 409 at 10x: mutation rechecked a newer timestamp after storage I/O. Compare against the fixed cycle-entry timestamp; retain bounded client retries for genuine 409/429, superseded by newer intent. Keep bounded catch-up and deterministic quanta unchanged.
-- [ ] Deploy backend then frontend to the verified existing targets; verify production changes and preserved canonical state.
+- [x] Deploy source 44d8884 backend then frontend to verified existing targets: Worker 7d31ef80-c41c-4062-86e2-30d61cdf069e, Pages https://5bd1f4bf.cellworld.pages.dev .
+- [x] Production probe initially returned 405 because the active DO retained old code under Cloudflare's deferred update default. Reapplied the same version at 100% with immediate mode; configured immediate strategy for future deploys, without changing storage identity.
+- [x] Live Chromium desktop/mobile: public 10x and 200% controls synced to both pages, persisted through F5; pause/reset stayed locked. Restored prior speed/rate after the live check; no reset or manual food action sent.
 
 ## Rendering performance follow-up
 

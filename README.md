@@ -56,6 +56,8 @@ Client nhận state ban đầu, bỏ revision cũ, reconnect backoff 0,5–30 gi
 
 `wrangler.jsonc` khai báo Worker, binding WORLD và migration `v1/new_sqlite_classes`. Giữ nguyên Worker name, class, migration cũ và canonical ID khi cập nhật để giữ namespace/dữ liệu.
 
+`durable_objects.code_update_strategy.mode` đặt `immediate` để object đang chạy nhận code mới cùng đợt deploy, trước khi frontend dùng endpoint mới. Runtime có thể khởi động lại và socket reconnect, nhưng constructor đọc lại SQLite, không reset world. Nếu dùng mặc định deferred, Worker mới có thể gọi object còn chạy code cũ tối đa 300 giây; từng gặp HTTP 405 với endpoint mới dù upload thành công. Tham khảo [code update strategy của Cloudflare](https://developers.cloudflare.com/durable-objects/deployments/durable-objects-code-updates/).
+
 Frontend đọc public `window.CELLWORLD_API` từ `config.js`; build tạo file này từ biến môi trường `CELLWORLD_API` (HTTP/HTTPS origin, không secret). Nếu hosting chưa cấu hình thì trang báo thiếu backend, không âm thầm tạo mô phỏng local. Localhost mặc định cổng 8787. WebSocket đổi `https → wss`, path `/ws`; REST dùng `/api/state`, `/api/controls`, `/api/admin`.
 
 `ALLOWED_ORIGINS` là danh sách origin chính xác phân cách dấu phẩy: mặc định `https://cellworld.pages.dev`, `http://127.0.0.1:5173`, `http://localhost:5173`. Không wildcard. Preview deployment URL phải được thêm chính xác nếu muốn sử dụng. Có thể bỏ localhost khỏi production. CORS hỗ trợ Authorization/Content-Type, `Vary: Origin`; state không cache. CLI không có Origin vẫn phải có token cho admin.

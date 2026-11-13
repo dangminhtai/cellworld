@@ -1,5 +1,15 @@
 # Production CELLWORLD
 
+## Cho mọi người chỉnh tốc độ và thức ăn
+
+Theo yêu cầu mới của người dùng: public speed 1×/5×/10× và food rate 0–200%, áp dụng cho world chung. Pause/step/reset/manual food vẫn admin-only. Backend và frontend source `44d8884` được deploy bằng workflow PowerShell đã xác minh identity; 28/28 tests PASS, typecheck/build PASS.
+
+- Frontend: https://5bd1f4bf.cellworld.pages.dev ; production alias giữ nguyên.
+- Worker version: 7d31ef80-c41c-4062-86e2-30d61cdf069e; giữ nguyên class, migrations và canonical ID.
+- Probe đầu phát hiện DO active giữ code cũ, /api/controls trả 405. Áp dụng lại cùng version 100% bằng `wrangler versions deploy ... --durable-objects-code-update-mode immediate --yes`; không xóa storage. Cấu hình lần sau dùng immediate, xem [Cloudflare docs](https://developers.cloudflare.com/durable-objects/deployments/durable-objects-code-updates/).
+- Sau đó live Chromium desktop/mobile PASS: khách không token chỉnh 10× và 200%, đồng bộ sang trang thứ hai, F5 giữ settings; pause/reset vẫn khóa. Settings test được khôi phục nếu chưa bị người khác đổi. Không reset world hoặc tạo food thủ công để thử.
+- World generation vẫn 0, giữ 100 IDs, clock/counters không giảm qua cập nhật backend. Rate và speed vẫn được server validate và persist.
+
 ## Sửa chuyển động giật (frontend)
 
 Frontend-only deployment: https://312a7b27.cellworld.pages.dev ; production alias vẫn https://cellworld.pages.dev/ . Source commit `2954363`. Đã chạy `npm.cmd run deploy:frontend -- -ApproveProduction` để khắc phục lỗi của đợt triển khai được người dùng phê duyệt; 26/26 tests, typecheck, build và preflight đều PASS. Không deploy lại backend, không sửa state hoặc schema.

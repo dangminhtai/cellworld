@@ -48,4 +48,3 @@ test('real browsers: shared world, F5, read-only controls, admin, reconnect and 
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await vite.close();await mf.dispose();}
 });
-
