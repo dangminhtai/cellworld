@@ -1,5 +1,13 @@
 # Kết quả kiểm chứng CELLWORLD
 
+## Quyền công khai: tốc độ và lượng thức ăn mới
+
+USER CONFIRMED: mọi người được chỉnh 1×/5×/10× và thanh thức ăn. Hai giá trị áp dụng cho thế giới chung, người gửi sau thay giá trị trước. Không mở pause/step/reset/thả thức ăn thủ công.
+
+PASS local: 28/28 automated checks, typecheck và build. Workerd kiểm tra public endpoint không token, vẫn hoạt động khi không có ADMIN_TOKEN, tốc độ/rate giới hạn đúng, rate limit 429, các lệnh riêng tư qua public endpoint trả 403, CORS chặn origin lạ, restart SQLite giữ speed/rate. Chromium desktop/mobile thật bấm 10× và phím End trên slider đến 200%, hai trang đồng bộ và giữ qua reload; pause/reset vẫn khóa.
+
+Trong kiểm tra đã phát hiện 409 giả khi I/O storage khiến đồng hồ mới vượt quantum sau khi catch-up đã xong. Sửa so backlog với timestamp cố định lúc bắt đầu cycle; không thay engine hoặc bỏ quantum. Client thử lại có giới hạn cho 409/429 thật, hủy retry cũ khi người dùng gửi ý định mới cùng loại. Không coi HTTP 200 là đủ bằng chứng lưu: so state ở browser thứ hai, API và sau restart.
+
 ## Sửa giật chuyển động
 
 P1: người dùng thấy tế bào giật. Tái hiện: mở production khi world chạy; Canvas chỉ vẽ lúc WebSocket gửi snapshot. Expected: chuyển động theo nhịp màn hình, server vẫn ~2 snapshot/s. Actual trước sửa: 16 lần vẽ / 16 snapshot trong 8,02 giây (~1,995 draw/s); khoảng cách snapshot median 500,1ms/max 505,9ms; ~39,6KB/s; không long task hoặc browser error trong probe.

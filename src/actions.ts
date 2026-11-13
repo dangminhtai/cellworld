@@ -1,5 +1,10 @@
 import { clamp, createWorld, food, MAXFOODS, rand, tick, W, H } from './simulation';
 import type { World } from './types';
+export function isPublicControl(value:unknown):boolean {
+  if(!value || typeof value!=='object')return false;
+  const type=(value as Record<string,unknown>).type;
+  return type==='speed'||type==='rate';
+}
 export function action(s:World, value:unknown):World {
   if(!value || typeof value!=='object')throw new Error('Invalid action');
   const a=value as Record<string,unknown>;

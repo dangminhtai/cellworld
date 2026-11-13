@@ -1,11 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
 import { advance, createWorld } from './simulation';
-import { action } from './actions';
+import { action, isPublicControl } from './actions';
 import type { Env, World } from './types';
 
 export class WorldObject extends DurableObject<Env> {
   private world!:World;
   private lastAction=0;
+  private lastPublicAction=0;
   constructor(ctx:DurableObjectState,env:Env){
     super(ctx,env);
     ctx.blockConcurrencyWhile(async()=>{
@@ -18,27 +19,38 @@ export class WorldObject extends DurableObject<Env> {
   private snapshot(){return {type:'snapshot',world:this.world,recoveryMs:Math.max(0,Date.now()-this.world.wall),adminConfigured:!!this.env.ADMIN_TOKEN};}
   private broadcast(){const msg=JSON.stringify(this.snapshot());for(const ws of this.ctx.getWebSockets()){try{ws.send(msg)}catch{ws.close(1011,'Resync');}}}
   private async cycle(){
-    advance(this.world,Date.now(),100,8);
+    const target=Date.now();
+    const remaining=advance(this.world,target,100,8);
     await this.ctx.storage.put('world',this.world);
     if(this.ctx.getWebSockets().length || Date.now()-this.world.wall>=100)await this.ctx.storage.setAlarm(Date.now()+500);
+    return remaining;
   }
   async fetch(req:Request){
     // Serialize requests AND alarms across storage awaits, including mutations.
     return this.ctx.blockConcurrencyWhile(async()=>{
       const url=new URL(req.url);
-      if(url.pathname==='/api/admin'){
-        if(!this.env.ADMIN_TOKEN || req.headers.get('Authorization')!==`Bearer ${this.env.ADMIN_TOKEN}`)return new Response('Unauthorized',{status:401});
-        if(req.method==='GET')return Response.json({authorized:true});
+      if(url.pathname==='/api/admin'||url.pathname==='/api/controls'){
+        const publicControl=url.pathname==='/api/controls';
+        if(!publicControl){
+          if(!this.env.ADMIN_TOKEN || req.headers.get('Authorization')!==`Bearer ${this.env.ADMIN_TOKEN}`)return new Response('Unauthorized',{status:401});
+          if(req.method==='GET')return Response.json({authorized:true});
+        }
         if(req.method!=='POST')return new Response('Method',{status:405});
-        if(Date.now()-this.lastAction<250)return new Response('Rate limited',{status:429});
-        this.lastAction=Date.now();
+        const last=publicControl?this.lastPublicAction:this.lastAction;
+        if(Date.now()-last<250)return new Response('Rate limited',{status:429,headers:{'Retry-After':'1'}});
+        if(publicControl)this.lastPublicAction=Date.now();else this.lastAction=Date.now();
         if(Number(req.headers.get('content-length'))>2048)return new Response('Too large',{status:413});
         const reader=req.body?.getReader();let raw='';let bytes=0;const decoder=new TextDecoder();
         if(reader)while(true){const chunk=await reader.read();if(chunk.done)break;bytes+=chunk.value.byteLength;if(bytes>2048){await reader.cancel();return new Response('Too large',{status:413});}raw+=decoder.decode(chunk.value,{stream:true});}
         raw+=decoder.decode();
-        await this.cycle();
-        if(Date.now()-this.world.wall>=100)return new Response('Recovery in progress; retry after synchronization',{status:409});
-        try{this.world=action(this.world,JSON.parse(raw));}catch{return new Response('Invalid action',{status:400});}
+        let value:unknown;
+        try{value=JSON.parse(raw);}catch{return new Response('Invalid JSON',{status:400});}
+        if(publicControl&&!isPublicControl(value))return new Response('Only speed and food rate are public',{status:403});
+        // Compare against the fixed entry timestamp, not a newer timestamp after
+        // storage I/O; otherwise a completed quantum can spuriously become stale.
+        const remaining=await this.cycle();
+        if(remaining>=100)return new Response('Recovery in progress; retry after synchronization',{status:409});
+        try{this.world=action(this.world,value);}catch{return new Response('Invalid action',{status:400});}
         await this.ctx.storage.put('world',this.world);this.broadcast();return Response.json({revision:this.world.revision});
       }
       if(req.method!=='GET')return new Response('Method',{status:405});

@@ -3,6 +3,8 @@ const $=id=>document.getElementById(id),canvas=$("canvas"),ctx=canvas.getContext
 const W=900,H=585,N=100;
 let cells=[],foods=[],selected=null,selectedId=null,t=0,world=null,authorized=false,token='',socket,attempt=0,lastMessage=0,recoveryMs=Infinity;
 let revision=-1;
+let editingRate=false;
+const publicCommandVersion={speed:0,rate:0};
 const renderBuffer=new CellworldRenderBuffer();
 let renderedCells=[],animationFrame=null;
 function scheduleDraw(){
@@ -21,17 +23,28 @@ const status=$("network"),sync=$("sync");
 const local=['localhost','127.0.0.1'].includes(location.hostname);
 const endpoint=window.CELLWORLD_API || (local?'http://127.0.0.1:8787':'');
 function controls(){
-const enabled=authorized&&socket?.readyState===WebSocket.OPEN&&recoveryMs<100;
+const connected=socket?.readyState===WebSocket.OPEN&&recoveryMs<100;
+const enabled=authorized&&connected;
 document.querySelectorAll('.controls button,.controls input').forEach(b=>b.disabled=!enabled);
+document.querySelectorAll('.speed,#rate').forEach(b=>b.disabled=!connected);
 $("step").disabled=!enabled||world?.running;
 $("admin").textContent=authorized?'Khóa quản trị':'Mở quản trị';
-if(world){$("pause").textContent=world.running?'⏸ Tạm dừng':'▶ Tiếp tục';$("rate").value=world.rate*100;$("rateLabel").textContent=Math.round(world.rate*100)+'%';document.querySelectorAll('.speed').forEach(b=>b.classList.toggle('active',Number(b.dataset.speed)===world.speed));}
+if(world){$("pause").textContent=world.running?'⏸ Tạm dừng':'▶ Tiếp tục';if(!editingRate){$("rate").value=world.rate*100;$("rateLabel").textContent=Math.round(world.rate*100)+'%';}document.querySelectorAll('.speed').forEach(b=>b.classList.toggle('active',Number(b.dataset.speed)===world.speed));}
 }
 async function command(value){
-if(!authorized)return;
-try{const res=await fetch(endpoint+'/api/admin',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(value)});
+const publicControl=['speed','rate'].includes(value.type);
+if(!publicControl&&!authorized)return false;
+const version=publicControl?++publicCommandVersion[value.type]:0;
+const send=()=>fetch(endpoint+(publicControl?'/api/controls':'/api/admin'),{method:'POST',headers:{'Content-Type':'application/json',...(!publicControl?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(value)});
+try{let res=await send();
+for(let retry=0;publicControl&&[429,409].includes(res.status)&&retry<8;retry++){
+await res.text();await new Promise(resolve=>setTimeout(resolve,350));
+if(version!==publicCommandVersion[value.type])return false;
+res=await send();
+}
 if(!res.ok){if(res.status===401){authorized=false;token='';controls();}throw Error(await res.text());}
-}catch(e){sync.textContent='Lệnh thất bại: '+e.message;}
+return true;
+}catch(e){sync.textContent='Lệnh thất bại: '+e.message;return false;}
 }
 function connect(){
 if(!endpoint){status.textContent='Chưa cấu hình backend';sync.textContent='Đặt CELLWORLD_API trong config.js (xem README).';controls();return;}
@@ -41,7 +54,7 @@ socket.onmessage=e=>{try{const data=JSON.parse(e.data);if(data.type!=='snapshot'
 lastMessage=Date.now();attempt=0;status.textContent='Đã kết nối';
 if(data.world.revision<revision)return;
 revision=data.world.revision;world=data.world;cells=world.cells;foods=world.foods;t=world.t;selected=cells.find(c=>c.id===selectedId)||null;
-recoveryMs=data.recoveryMs;sync.textContent=recoveryMs>=100?'Đang khôi phục: còn '+(recoveryMs/1000).toFixed(1)+' giây thực':'Đã đồng bộ · revision '+revision+(data.adminConfigured?' · khách chỉ xem':' · quản trị chưa cấu hình');
+recoveryMs=data.recoveryMs;sync.textContent=recoveryMs>=100?'Đang khôi phục: còn '+(recoveryMs/1000).toFixed(1)+' giây thực':'Đã đồng bộ · revision '+revision+' · mọi người được chỉnh tốc độ và thức ăn'+(data.adminConfigured?'':' · quản trị chưa cấu hình');
 renderBuffer.push(world,performance.now(),recoveryMs);
 controls();update();scheduleDraw();}catch{sync.textContent='Dữ liệu không hợp lệ';socket.close();}};
 socket.onclose=()=>{status.textContent='Mất kết nối · đang thử lại';controls();setTimeout(connect,Math.min(30000,500*2**Math.min(attempt++,6))+Math.random()*300);};
@@ -84,7 +97,11 @@ try{const r=await fetch(endpoint+'/api/admin',{headers:{Authorization:'Bearer '+
 $("pause").onclick=()=>command({type:'pause',running:!world.running});
 $("step").onclick=()=>command({type:'step'});
 $("reset").onclick=()=>{if(confirm('Tạo lại thế giới chung cho TẤT CẢ người xem?'))command({type:'reset'});};
-$("rate").onchange=e=>command({type:'rate',value:Number(e.target.value)/100});
+$("rate").onpointerdown=()=>{editingRate=true;};
+$("rate").oninput=e=>{editingRate=true;$("rateLabel").textContent=e.target.value+'%';};
+$("rate").onpointerup=()=>{editingRate=false;};
+$("rate").onblur=()=>{editingRate=false;controls();};
+$("rate").onchange=e=>{editingRate=false;command({type:'rate',value:Number(e.target.value)/100});};
 document.querySelectorAll('.speed').forEach(b=>b.onclick=()=>command({type:'speed',value:Number(b.dataset.speed)}));
 canvas.addEventListener('pointerdown',e=>{
 const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;

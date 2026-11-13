@@ -1,5 +1,12 @@
 # CELLWORLD implementation log
 
+## Public speed and food-rate controls
+
+- [x] User requested anyone may use up to 10x speed and the food-spawn slider. These change the shared world; pause/step/reset/manual food stay admin-only.
+- [x] Add an allowlisted public endpoint with existing server validation, independent mutation rate limit and shared persistence/broadcast. Unlock only speed and rate controls in the frontend.
+- [x] Verify public changes across browsers/reload/restart, forbidden actions, invalid values and rate limits. Found transient 409 at 10x: mutation rechecked a newer timestamp after storage I/O. Compare against the fixed cycle-entry timestamp; retain bounded client retries for genuine 409/429, superseded by newer intent. Keep bounded catch-up and deterministic quanta unchanged.
+- [ ] Deploy backend then frontend to the verified existing targets; verify production changes and preserved canonical state.
+
 ## Rendering performance follow-up
 
 - [x] Profile production read-only for 8 seconds: 16 draws / 16 snapshots (1.995 draws/s), median snapshot gap 500.1ms, maximum 505.9ms, ~39.6KB/s, no long tasks, 100 alive cells. Canvas only drew on WebSocket messages.

@@ -2,7 +2,7 @@
 
 Thế giới chung 100 tế bào: frontend HTML/CSS/Canvas trên **Cloudflare Pages**, backend Worker `cellworld-backend` chứa một **SQLite-backed Durable Object**. Giữ giao diện và luật cũ; GitHub Pages vẫn có thể phục vụ frontend với cùng backend.
 
-Production đã triển khai sau phê duyệt: **https://cellworld.pages.dev/**. Backend: https://cellworld-backend.dmt826321.workers.dev . F5 và hai trang production đã kiểm tra PASS; xem [deployment.md](deployment.md) và [QA.md](QA.md) cho phạm vi bằng chứng. Chưa đặt ADMIN_TOKEN nên hiện mặc định chỉ xem.
+Production: **https://cellworld.pages.dev/**. Backend: https://cellworld-backend.dmt826321.workers.dev . Mọi người được chỉnh tốc độ 1×/5×/10× và hệ số sinh thức ăn 0–200%; thay đổi áp dụng cho thế giới chung, người chỉnh sau ghi đè giá trị trước. Pause/step/reset/thả thức ăn thủ công vẫn cần ADMIN_TOKEN. Xem [deployment.md](deployment.md) và [QA.md](QA.md) cho bằng chứng kiểm thử.
 
 ## Luật gốc
 
@@ -22,7 +22,7 @@ npm run dev
 
 Mở http://127.0.0.1:5173/ ; backend tại http://127.0.0.1:8787/ . Một lệnh khởi chạy cả hai. `Ctrl+C` kết thúc dev. SQLite local lưu trong `.wrangler/state`, giữ qua lần chạy sau; không xóa thư mục này nếu muốn giữ thế giới local.
 
-Không có secret thì khách vẫn xem được, các điều khiển thế giới bị khóa. Để thử quản trị local, tạo `.dev.vars` (gitignored) rồi restart dev:
+Không có secret thì khách vẫn xem và chỉnh được tốc độ/hệ số sinh thức ăn. Các điều khiển quản trị còn lại bị khóa. Để thử quản trị local, tạo `.dev.vars` (gitignored) rồi restart dev:
 
 ```text
 ADMIN_TOKEN="YOUR_LONG_RANDOM_LOCAL_TOKEN"
@@ -48,13 +48,15 @@ Mỗi batch tối đa 100 quantum (10 giây thực), dừng sau quantum nếu ng
 
 WebSocket dùng Hibernation API. Khi có người xem, alarm mỗi 500ms phát snapshot (~2Hz), tránh ghi 30 lần/giây. Không còn người xem và backlog đã hết thì dừng alarm. Kết nối lại sẽ chạy bù từng bước theo timestamp, không bỏ sự kiện hoặc cắt bỏ offline dài. Đây là **khôi phục logic**, không phải CPU thực thi từng giây khi object ngủ. Nghỉ nhiều ngày có thể cần nhiều batch; UI báo số giây thực còn phải khôi phục và quản trị nhận 409 cho đến khi bắt kịp. Restart tiếp tục từ batch đã commit, giữ thứ tự random transition. Persisted record tồn tại thì không tạo lại 100 tế bào.
 
-Client nhận state ban đầu, bỏ revision cũ, reconnect backoff 0,5–30 giây kèm jitter và resync. Canvas vẽ bằng requestAnimationFrame và nội suy vị trí giữa các snapshot đã nhận, độ trễ hiển thị thêm khoảng một chu kỳ snapshot (~500ms). Không chạy engine hoặc đoán vị trí tương lai trên client. Food/counters/death lấy từ snapshot mới nhất; pause/reset/recovery hiển thị ngay không nội suy. Chọn cell dùng vị trí đang vẽ. Frame loop dừng khi đã đến vị trí cuối, không còn chuyển động hoặc tab bị ẩn. Watchdog đóng socket không nhận snapshot trong 15 giây. Tối đa 100 socket/world. Socket chỉ nhận dữ liệu; gửi message sẽ bị đóng. Admin qua REST có token, payload <= 2KiB, validation và tối đa 1 mutation/250ms toàn world. Đây là giới hạn ứng dụng, không phải hệ thống chống DDoS.
+Client nhận state ban đầu, bỏ revision cũ, reconnect backoff 0,5–30 giây kèm jitter và resync. Canvas vẽ bằng requestAnimationFrame và nội suy vị trí giữa các snapshot đã nhận, độ trễ hiển thị thêm khoảng một chu kỳ snapshot (~500ms). Không chạy engine hoặc đoán vị trí tương lai trên client. Food/counters/death lấy từ snapshot mới nhất; pause/reset/recovery hiển thị ngay không nội suy. Chọn cell dùng vị trí đang vẽ. Frame loop dừng khi đã đến vị trí cuối, không còn chuyển động hoặc tab bị ẩn. Watchdog đóng socket không nhận snapshot trong 15 giây. Tối đa 100 socket/world. Socket chỉ nhận dữ liệu; gửi message sẽ bị đóng.
+
+`POST /api/controls` không cần token, chỉ cho phép `speed` (1/5/10) và `rate` (0–2). Không có quyền reset/pause/step/thêm food thủ công qua endpoint này. Payload <= 2KiB, validate phía server, CORS origin cụ thể; public mutations giới hạn toàn world 1 lệnh/250ms, độc lập limiter admin. Khi gặp 429 hoặc recovery 409 tạm thời, client thử lại tối đa 8 lần cách 350ms; yêu cầu mới cùng loại hủy việc retry yêu cầu cũ. Slider không bị snapshot ghi đè trong lúc kéo. `/api/admin` vẫn yêu cầu token cho mọi request, có limiter riêng cùng mức. Đây là giới hạn ứng dụng, không phải chống DDoS.
 
 ## Cloudflare, endpoints và secrets
 
 `wrangler.jsonc` khai báo Worker, binding WORLD và migration `v1/new_sqlite_classes`. Giữ nguyên Worker name, class, migration cũ và canonical ID khi cập nhật để giữ namespace/dữ liệu.
 
-Frontend đọc public `window.CELLWORLD_API` từ `config.js`; build tạo file này từ biến môi trường `CELLWORLD_API` (HTTP/HTTPS origin, không secret). Nếu hosting chưa cấu hình thì trang báo thiếu backend, không âm thầm tạo mô phỏng local. Localhost mặc định cổng 8787. WebSocket đổi `https → wss`, path `/ws`; REST dùng `/api/state`, `/api/admin`.
+Frontend đọc public `window.CELLWORLD_API` từ `config.js`; build tạo file này từ biến môi trường `CELLWORLD_API` (HTTP/HTTPS origin, không secret). Nếu hosting chưa cấu hình thì trang báo thiếu backend, không âm thầm tạo mô phỏng local. Localhost mặc định cổng 8787. WebSocket đổi `https → wss`, path `/ws`; REST dùng `/api/state`, `/api/controls`, `/api/admin`.
 
 `ALLOWED_ORIGINS` là danh sách origin chính xác phân cách dấu phẩy: mặc định `https://cellworld.pages.dev`, `http://127.0.0.1:5173`, `http://localhost:5173`. Không wildcard. Preview deployment URL phải được thêm chính xác nếu muốn sử dụng. Có thể bỏ localhost khỏi production. CORS hỗ trợ Authorization/Content-Type, `Vary: Origin`; state không cache. CLI không có Origin vẫn phải có token cho admin.
 
