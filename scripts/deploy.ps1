@@ -26,7 +26,7 @@ try {
   npm run build
   if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
   if ($Check) { Write-Host 'Checks complete; no deployment.'; return }
-  if (-not $ApproveProduction) { throw 'Production not approved. Review the target, then pass -ApproveProduction explicitly (npm run deploy -- -ApproveProduction).' }
+  if (-not $ApproveProduction) { throw 'Production not approved. Review the target, then pass -ApproveProduction explicitly (npm.cmd run deploy -- -ApproveProduction).' }
   if (-not $target.pagesExists) {
     if (-not $CreateProject) { throw 'cellworld does not exist. Pass -CreateProject explicitly after review.' }
     npx wrangler pages project create cellworld --production-branch main --force

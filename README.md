@@ -75,13 +75,13 @@ Cùng kiểu workflow local như project `choicungnhau`, nhưng chỉ nhắm **P
 Chạy kiểm tra, không deploy:
 
 ```powershell
-npm run deploy -- -Check
+npm.cmd run deploy -- -Check
 ```
 
 Sau khi người sở hữu phê duyệt đợt production, lần đầu:
 
 ```powershell
-npm run deploy -- -ApproveProduction -CreateProject
+npm.cmd run deploy -- -ApproveProduction -CreateProject
 ```
 
 Script kiểm tra account/identity, chạy typecheck/tests/build, tạo Pages project nếu được cho phép, deploy Worker + DO trước, xác nhận backend schema, rồi deploy frontend bằng `--project-name cellworld --branch main`. `--force` khi tạo Pages là opt-out của Wrangler khỏi chuyển sang Workers; lỗi quyền hoặc tên không khả dụng sẽ dừng, không chọn project khác. Danh sách project trong account không đủ chứng minh tên toàn cục còn trống, phải chờ tạo project thành công.
@@ -89,12 +89,14 @@ Script kiểm tra account/identity, chạy typecheck/tests/build, tạo Pages pr
 Những lần sau, hoặc deploy từng phần:
 
 ```powershell
-npm run deploy -- -ApproveProduction
-npm run deploy:backend -- -ApproveProduction
-npm run deploy:frontend -- -ApproveProduction
+npm.cmd run deploy -- -ApproveProduction
+npm.cmd run deploy:backend -- -ApproveProduction
+npm.cmd run deploy:frontend -- -ApproveProduction
 ```
 
 Frontend-only vẫn preflight và kiểm tra backend. Script tự ghi project ID/Worker tag vào file local sau tạo/deploy thành công. Nếu bị ngắt trước khi ghi identity, kiểm tra Dashboard, source repository và lịch sử deployment trước khi điền đúng IDs; không nhận bừa một project trùng tên. Tài nguyên có từ trước cũng cần người sở hữu đối chiếu thủ công như vậy trước lần deploy đầu.
+
+Các lệnh có tham số dùng `npm.cmd` để tránh Windows PowerShell gọi `npm.ps1` rồi làm mất dấu `--` và các switch phía sau. Các npm command không có tham số vẫn dùng `npm run ...` bình thường. Có thể gọi trực tiếp `.\scripts\deploy.ps1 -Check` hoặc `.\scripts\deploy.ps1 -ApproveProduction -CreateProject`.
 
 URL dự kiến **https://cellworld.pages.dev/** chỉ được xác nhận sau tạo/deploy thành công. Không sửa project `choicungnhau`, không thay tên nếu `cellworld` không dùng được.
 

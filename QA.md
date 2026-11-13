@@ -13,7 +13,7 @@ Lượt kiểm tra cuối: `npm test` **21/21 PASS**, `npm run typecheck` PASS, 
 | Read-only và admin | Khách không reset, origin lạ bị chặn | Thực tế 401/403, CORS preflight, invalid action 400, rate limit 429, recovery chặn mutation 409 | PASS |
 | UI | Hai trình duyệt quan sát cùng world, responsive và chọn cell | Chromium desktop + 390px; pause qua admin, F5 mất quyền admin nhưng giữ state, reconnect và pointer selection; không pageerror | PASS |
 | Account Cloudflare | Xác minh đúng tài khoản và project | `wrangler whoami --json`: một account; `pages project list --json`: chỉ choicungnhau, chưa có cellworld | PASS (read-only) |
-| Quyền backend | Có quyền đọc subdomain và deploy Worker | Probe GET workers/scripts: 200; GET workers/subdomain: 403 / code 10000. OAuth chỉ báo user/account read, Pages write; thiếu Workers scopes | BLOCKED |
+| Quyền backend | Có quyền đọc subdomain và quyền Workers trong OAuth | Ban đầu subdomain 403/code 10000; sau user cấp quyền qua wrangler login, OAuth có Workers scopes và subdomain lookup 200. Chưa thực hiện deploy để kiểm chứng quyền ghi | PASS (read-only/scopes); deployment NOT TESTED |
 | Chống overwrite | Từ chối tên/identity/URL sai; cần approval; backend trước frontend | Tests pure target validator và static thứ tự script. Chạy `npm run deploy` không có file cấu hình: exit lỗi trước ghi tài nguyên | PASS trong phạm vi này |
 | Typecheck/build | Không có lỗi | `npm run typecheck`, `npm run build`, `wrangler deploy --dry-run --outdir test-results/worker`, `node --check` | PASS |
 | Production deployment | Chỉ sau phê duyệt; đúng cellworld | Không thực hiện. Chưa xác nhận tên Pages khả dụng toàn cục | NOT TESTED |
@@ -22,4 +22,6 @@ Lượt kiểm tra cuối: `npm test` **21/21 PASS**, `npm run typecheck` PASS, 
 
 Không còn lỗi chức năng đã biết sau các kiểm thử local. Những dòng PASS không mở rộng thành cam kết production. Guard PowerShell chưa thực hiện đường deploy có quyền thật; `--dry-run` chỉ chứng minh bundling/config hợp lệ.
 
-Blocker triển khai: P1, thiếu quyền OAuth Worker/subdomain. Tái hiện: đăng nhập hiện tại, GET `/accounts/<verified-account-id>/workers/subdomain` bằng credential Wrangler -> HTTP 403, error 10000. Expected: 200 với account subdomain. Cách xử lý: chủ sở hữu chạy `npx wrangler login` cấp đủ quyền, kiểm tra lại account rồi phê duyệt deployment. Không sửa project khác để né blocker.
+Blocker quyền trước đó đã được xử lý bằng `npx wrangler login` theo yêu cầu người dùng. Account giữ nguyên; OAuth có Workers/Pages scopes và GET workers/subdomain trả 200. File deployment.local.json được tạo từ account/subdomain xác minh thật, không có secret và không commit. Vẫn cần phê duyệt production riêng trước khi tạo Pages/Worker; chưa chứng minh tên cellworld khả dụng toàn cục.
+
+Phát hiện và sửa hướng dẫn PowerShell: `npm run deploy -- -Check` qua npm.ps1 đã làm mất switch; script vẫn chặn production do không có approval. Dùng `npm.cmd run deploy -- -Check` truyền switch đúng, hoặc gọi trực tiếp scripts/deploy.ps1. Không phát sinh ghi tài nguyên cloud trong quá trình kiểm tra.
