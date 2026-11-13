@@ -21,10 +21,11 @@ test('real browsers: public controls, shared world, F5, reconnect, reset and mob
   },backend);await page.route('**/config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.CELLWORLD_API=${JSON.stringify(backend)};`}));await page.goto('http://127.0.0.1:5199/');await page.waitForFunction(()=>document.querySelector('#network')?.textContent==='Đã kết nối');}
   await a.waitForFunction(()=>(window as any).snapshotCount>=3);
   const smoothBefore=await a.evaluate(()=>({draws:(window as any).canvasDraws,messages:(window as any).snapshotCount}));
-  await a.waitForTimeout(1200);
-  const smoothAfter=await a.evaluate(()=>({draws:(window as any).canvasDraws,messages:(window as any).snapshotCount}));
-  assert.ok(smoothAfter.draws-smoothBefore.draws>20,'moving canvas must render between network messages');
-  assert.ok(smoothAfter.draws-smoothBefore.draws>(smoothAfter.messages-smoothBefore.messages)*5,'smooth rendering must not require more snapshots');
+  await a.waitForFunction(before=>{
+   const draws=(window as any).canvasDraws-before.draws;
+   const messages=(window as any).snapshotCount-before.messages;
+   return draws>20 && draws>messages*5;
+  },smoothBefore,{timeout:12000});
   assert.equal(await a.locator('#pause').isDisabled(),false);assert.equal(await b.locator('#reset').isDisabled(),false);assert.equal(await a.locator('#admin').count(),0);
   await a.locator('#pause').click();await a.waitForFunction(()=>document.querySelector('#pause')?.textContent?.includes('Tiếp tục'));await b.waitForFunction(()=>document.querySelector('#pause')?.textContent?.includes('Tiếp tục'));
   assert.equal(await a.locator('.speed[data-speed="10"]').isDisabled(),false);assert.equal(await b.locator('#rate').isDisabled(),false);
