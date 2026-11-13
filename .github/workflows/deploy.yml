@@ -1,0 +1,43 @@
+name: Deploy CELLWORLD
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: cellworld-production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          CELLWORLD_API: https://cellworld-backend.dmt826321.workers.dev
+      - name: Deploy Worker and Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then
+            echo "::error::Missing Cloudflare repository secret"
+            exit 1
+          fi
+          npx --no-install wrangler deploy --config wrangler.jsonc
+          npx --no-install wrangler pages deploy dist --project-name cellworld --branch main --commit-hash "$GITHUB_SHA"
+      - name: Check production
+        run: |
+          curl -fsS --retry 5 --max-time 20 https://cellworld-backend.dmt826321.workers.dev/api/state | jq -e '.world.schema == 1'
+          curl -fsS --retry 5 --max-time 20 "https://cellworld.pages.dev/frontend.js?sha=$GITHUB_SHA" | cmp dist/frontend.js
