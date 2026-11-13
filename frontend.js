@@ -71,6 +71,11 @@ const male=(c.sex??(c.id%2?"male":"female"))==="male";
 ctx.arc(c.x,c.y,radius*(male ? .25 : .43),0,Math.PI*2);
 if(male)ctx.fill();else{ctx.lineWidth=1;ctx.stroke();}
 }
+if(world?.monster){
+ const m=world.monster;
+ ctx.font="26px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+ ctx.fillText("👾",m.x,m.y);ctx.textAlign="start";ctx.textBaseline="alphabetic";
+}
 const focus=renderedCells.find(c=>c.id===selectedId);
 if(focus){
 ctx.strokeStyle=focus.alive?"#c7f59d":"#e78585";ctx.lineWidth=1.4;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(focus.x,focus.y,90,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);

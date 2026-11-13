@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { advance, createWorld } from './simulation';
+import { advance, createWorld, ensureMonster } from './simulation';
 import { action } from './actions';
 import type { Env, World } from './types';
 
@@ -13,6 +13,7 @@ export class WorldObject extends DurableObject<Env> {
       const saved=await ctx.storage.get<World>('world');
       if(saved && saved.schema!==1)throw Error('Unsupported world schema; refusing reset');
       this.world=saved??createWorld(Date.now());
+      ensureMonster(this.world);
       if(!saved)await ctx.storage.put('world',this.world);
     });
   }
@@ -20,6 +21,7 @@ export class WorldObject extends DurableObject<Env> {
   private broadcast(){const msg=JSON.stringify(this.snapshot());for(const ws of this.ctx.getWebSockets()){try{ws.send(msg)}catch{ws.close(1011,'Resync');}}}
   private async cycle(){
     const target=Date.now();
+    ensureMonster(this.world);
     // Scale the catch-up allowance while bounding each alarm cycle.
     const remaining=advance(this.world,target,100,Math.min(80,8*this.world.speed));
     this.recovering=remaining>=100;
@@ -45,7 +47,7 @@ export class WorldObject extends DurableObject<Env> {
         // storage I/O; otherwise a completed quantum can spuriously become stale.
         const remaining=await this.cycle();
         if(remaining>=100)return new Response('Recovery in progress; retry after synchronization',{status:409});
-        try{this.world=action(this.world,value);}catch{return new Response('Invalid action',{status:400});}
+        try{this.world=action(this.world,value);ensureMonster(this.world);}catch{return new Response('Invalid action',{status:400});}
         await this.ctx.storage.put('world',this.world);this.broadcast();return Response.json({revision:this.world.revision});
       }
       if(req.method!=='GET')return new Response('Method',{status:405});

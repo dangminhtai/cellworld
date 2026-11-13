@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {advance,createWorld,food,tick} from '../src/simulation';
+import {advance,createWorld,ensureMonster,food,tick} from '../src/simulation';
 import {action} from '../src/actions';
 
 function isolated(){const s=createWorld(0);s.rate=0;s.foods=[];s.cells.slice(1).forEach(c=>c.alive=false);const c=s.cells[0];Object.assign(c,{x:450,y:290,direction:0,velocity:20,turnIn:3,target:null});return s;}
@@ -85,4 +85,21 @@ test('fresh contact can produce one child and the fixed cap allows replacement a
   assert.equal(s.cells.length,deaths===0?100:deaths===1?101:105);
   if(deaths===1)assert.ok(s.cells.at(-1)?.sex);
  }
+});
+test('monster eats the closest cell and waits 15 simulation seconds',()=>{
+ const s=isolated();
+ ensureMonster(s);
+ const m=s.monster!;
+ const [near,far]=s.cells;
+ Object.assign(near,{x:m.x+15,y:m.y,velocity:0});
+ Object.assign(far,{x:m.x-40,y:m.y,velocity:20,alive:true});
+ const start=far.x;
+ tick(s);
+ assert.equal(near.alive,false);
+ assert.equal(far.alive,true);
+ assert.ok(far.x<start);
+ assert.equal(m.restUntil,s.t+15);
+ const location=m.x;
+ tick(s);
+ assert.equal(m.x,location);
 });

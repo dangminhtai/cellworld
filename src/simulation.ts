@@ -87,6 +87,34 @@ function reproduce(s:World,a:Cell,b:Cell){
 
 const sex=(c:Cell)=>c.sex??(c.id%2?'male':'female');
 
+export function ensureMonster(s:World){
+ s.monster??={x:W/2,y:H/2,direction:0,turnAt:s.t,restUntil:s.t};
+}
+
+function moveMonster(s:World,dt:number){
+ const m=s.monster!;
+ if(m.restUntil>s.t)return;
+ let target:Cell|undefined;
+ let nearest=120**2;
+ for(const c of s.cells){
+  if(!c.alive)continue;
+  const d=distance(m,c);
+  if(d<=nearest&&(!target||d<nearest)){target=c;nearest=d;}
+ }
+ if(target)m.direction=Math.atan2(target.y-m.y,target.x-m.x);
+ else if(s.t>=m.turnAt){m.direction=rand(s,-Math.PI,Math.PI);m.turnAt=s.t+3;}
+ const x=m.x+Math.cos(m.direction)*(target?44:18)*dt;
+ const y=m.y+Math.sin(m.direction)*(target?44:18)*dt;
+ if(x<12||x>W-12)m.direction=Math.PI-m.direction;
+ if(y<12||y>H-12)m.direction=-m.direction;
+ m.x=clamp(x,12,W-12);
+ m.y=clamp(y,12,H-12);
+ if(target&&distance(m,target)<=(12+radius(target))**2){
+  target.alive=false;
+  m.restUntil=s.t+15;
+ }
+}
+
 export function tick(s: World, dt = 1/30){
 let {cells, foods, rate, debt, t} = s;
 const random=(a=0,b=1)=>rand(s,a,b);
@@ -102,7 +130,13 @@ const encounters:[Cell,Cell][]=[];
 for(const c of cells){
 if(!c.alive)continue;
 c.flash=Math.max(0,c.flash-dt);
-const avoiding=(c.avoidUntil??0)>t;
+const fleeing=s.monster&&distance(c,s.monster)<=90**2;
+if(fleeing){
+ const m=s.monster!;
+ c.target=null;
+ c.direction=Math.atan2(c.y-m.y,c.x-m.x);
+}
+const avoiding=fleeing||(c.avoidUntil??0)>t;
 let index=-1,best=90*90;
 if(!avoiding && c.target !== null){let i=foods.findIndex(f=>f.id===c.target);if(i>=0&&distance(c,foods[i])<=best){index=i;best=distance(c,foods[i])}else c.target=null}
 if(!avoiding && index===-1){for(let i=0;i<foods.length;i++){let d=distance(c,foods[i]);if(d<best){best=d;index=i}}}
@@ -137,6 +171,7 @@ if(move(c,cells,dt,other=>{
 }
 for(const [a,b] of encounters)reproduce(s,a,b);
 s.t=t;s.debt=debt;
+if(s.monster)moveMonster(s,dt);
 }
 
 // Integer 100ms wall quanta; each quantum always executes exactly 3 * speed ticks.
