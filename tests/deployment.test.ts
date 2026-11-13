@@ -15,6 +15,8 @@ test('deployment refuses unrelated names, unrecorded projects, wrong identity, m
  assert.doesNotThrow(()=>verifyTargets(fresh,page,worker,url,{record:true}));assert.throws(()=>verifyTargets(known,page,{...worker,tag:'different'},url,{record:true}));
 });
 test('PowerShell production approval gate precedes any resource writes; backend deployment precedes frontend',()=>{
+ const config=JSON.parse(readFileSync('wrangler.jsonc','utf8'));
+ assert.equal(config.durable_objects.code_update_strategy.mode,'immediate','new frontend endpoints must not wait for an old active object to hibernate');
  const script=readFileSync('scripts/deploy.ps1','utf8');const gate=script.indexOf('if (-not $ApproveProduction)');
  const create=script.indexOf('npx wrangler pages project create'),backend=script.indexOf('npx wrangler deploy --config'),frontend=script.indexOf('npx wrangler pages deploy');
  assert.ok(gate>0&&gate<create&&create<backend&&backend<frontend);assert.match(script,/pages deploy dist --project-name cellworld --branch main/);assert.doesNotMatch(script,/project-name choicungnhau/);

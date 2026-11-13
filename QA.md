@@ -1,5 +1,25 @@
 # Kết quả kiểm chứng CELLWORLD
 
+## Hiện tại: bỏ quản trị theo yêu cầu người dùng
+
+Không còn token, phân quyền, nút đăng nhập, metadata adminConfigured hoặc endpoint /api/admin. Tất cả lệnh hợp lệ công khai qua /api/controls. Giữ server validation/CORS/throttle, shared persistence và xác nhận reset. Các mục quyền quản trị bên dưới là lịch sử đã bị yêu cầu mới thay thế.
+
+PASS local: 27/27 tests và typecheck. Browser thực hiện pause/step/reset không đăng nhập; API thực hiện thêm food, giữ settings qua SQLite restart; validation và CORS vẫn PASS. Reconnect test nay chờ socket mới thật và nhận mutation tiếp theo, sửa close reply dùng code 1000 hợp lệ. Catch-up dùng ngân sách 8ms × speed (tối đa 80ms), giữ 100 quantum/batch; readiness dùng backlog tới timestamp entry thay vì tính cả thời gian I/O, tránh khóa nút giả ở 10×. Không thay thuật toán sinh học hoặc reset world khi deploy.
+
+PASS production sau deployment 62cd394a / Worker f6183144-f437-4a43-aa65-6e94c104940a: không còn nút quản trị, pause/reset mở; live pause đồng bộ hai browser, speed/rate giữ qua F5; observation-only F5/IDs/counters PASS. Test không gọi reset production. Sửa payload cleanup của live probe dùng running cho pause rồi chạy lại exit 0, khôi phục đúng trạng thái chạy và speed/rate trước thử.
+
+## Quyền công khai: tốc độ và lượng thức ăn mới
+
+USER CONFIRMED: mọi người được chỉnh 1×/5×/10× và thanh thức ăn. Hai giá trị áp dụng cho thế giới chung, người gửi sau thay giá trị trước. Không mở pause/step/reset/thả thức ăn thủ công.
+
+PASS local: 28/28 automated checks, typecheck và build. Workerd kiểm tra public endpoint không token, vẫn hoạt động khi không có ADMIN_TOKEN, tốc độ/rate giới hạn đúng, rate limit 429, các lệnh riêng tư qua public endpoint trả 403, CORS chặn origin lạ, restart SQLite giữ speed/rate. Chromium desktop/mobile thật bấm 10× và phím End trên slider đến 200%, hai trang đồng bộ và giữ qua reload; pause/reset vẫn khóa.
+
+Trong kiểm tra đã phát hiện 409 giả khi I/O storage khiến đồng hồ mới vượt quantum sau khi catch-up đã xong. Sửa so backlog với timestamp cố định lúc bắt đầu cycle; không thay engine hoặc bỏ quantum. Client thử lại có giới hạn cho 409/429 thật, hủy retry cũ khi người dùng gửi ý định mới cùng loại. Không coi HTTP 200 là đủ bằng chứng lưu: so state ở browser thứ hai, API và sau restart.
+
+PASS production: Worker 7d31ef80-c41c-4062-86e2-30d61cdf069e, frontend 5bd1f4bf từ 44d8884. Live Chromium desktop/mobile không token bấm 10× và slider 200%, cả hai thấy cùng giá trị, F5 giữ settings và pause/reset vẫn khóa. Script verify-public-controls.mjs khôi phục settings cũ nếu vẫn bằng giá trị test, không gửi reset hoặc tạo food thủ công.
+
+Phát hiện rollout P1: lần probe đầu trả 405 do Durable Object đang hoạt động còn chạy code cũ mặc dù Worker đã deploy mới. Cloudflare mặc định deferred tối đa 300s. Dùng versions deploy cùng version @100% với --durable-objects-code-update-mode immediate, rồi live probe PASS. Thêm strategy immediate trong wrangler.jsonc để lần deploy sau backend/DO sẵn sàng trước frontend. Đã kiểm tra state generation/IDs/time/counters qua lần deploy, không reset thế giới.
+
 ## Sửa giật chuyển động
 
 P1: người dùng thấy tế bào giật. Tái hiện: mở production khi world chạy; Canvas chỉ vẽ lúc WebSocket gửi snapshot. Expected: chuyển động theo nhịp màn hình, server vẫn ~2 snapshot/s. Actual trước sửa: 16 lần vẽ / 16 snapshot trong 8,02 giây (~1,995 draw/s); khoảng cách snapshot median 500,1ms/max 505,9ms; ~39,6KB/s; không long task hoặc browser error trong probe.

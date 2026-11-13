@@ -2,7 +2,7 @@
 
 Thế giới chung 100 tế bào: frontend HTML/CSS/Canvas trên **Cloudflare Pages**, backend Worker `cellworld-backend` chứa một **SQLite-backed Durable Object**. Giữ giao diện và luật cũ; GitHub Pages vẫn có thể phục vụ frontend với cùng backend.
 
-Production đã triển khai sau phê duyệt: **https://cellworld.pages.dev/**. Backend: https://cellworld-backend.dmt826321.workers.dev . F5 và hai trang production đã kiểm tra PASS; xem [deployment.md](deployment.md) và [QA.md](QA.md) cho phạm vi bằng chứng. Chưa đặt ADMIN_TOKEN nên hiện mặc định chỉ xem.
+Production: **https://cellworld.pages.dev/**. Backend: https://cellworld-backend.dmt826321.workers.dev . Mọi người đều dùng được toàn bộ điều khiển: tốc độ, thức ăn, pause/resume, bước 1 giây khi pause, reset và thả thức ăn bằng cách chạm. Không có đăng nhập, token hoặc vai trò quản trị. Thay đổi áp dụng lên thế giới chung cho tất cả người xem. Xem [deployment.md](deployment.md) và [QA.md](QA.md).
 
 ## Luật gốc
 
@@ -22,13 +22,7 @@ npm run dev
 
 Mở http://127.0.0.1:5173/ ; backend tại http://127.0.0.1:8787/ . Một lệnh khởi chạy cả hai. `Ctrl+C` kết thúc dev. SQLite local lưu trong `.wrangler/state`, giữ qua lần chạy sau; không xóa thư mục này nếu muốn giữ thế giới local.
 
-Không có secret thì khách vẫn xem được, các điều khiển thế giới bị khóa. Để thử quản trị local, tạo `.dev.vars` (gitignored) rồi restart dev:
-
-```text
-ADMIN_TOKEN="YOUR_LONG_RANDOM_LOCAL_TOKEN"
-```
-
-Chọn **Mở quản trị**, nhập token. Token chỉ nằm trong bộ nhớ tab và Authorization header; không ghi localStorage, URL hay bundle. F5 khóa quyền quản trị lại, không reset thế giới. Production dùng secret Wrangler riêng; `.dev.vars` không cấu hình production.
+Không cần tạo secret. Khi kết nối và đồng bộ xong, tất cả điều khiển đều dùng được. Nút +1 giây chỉ bật lúc pause; reset vẫn có hộp xác nhận vì tác động toàn bộ thế giới.
 
 ```powershell
 npm run typecheck
@@ -44,27 +38,23 @@ Mọi người được route đến `WORLD.idFromName('canonical-world-v1')`; k
 
 Engine bước cố định 1/30 giây. Đồng hồ thực tiến theo quantum nguyên 100ms, mỗi quantum chạy đúng `3 × speed` bước, hoặc chỉ tiến timestamp khi pause. Phần dư dưới 100ms được giữ lại. Thao tác quản trị áp dụng tại ranh giới quantum hiện tại. Đồng hồ hệ thống đi lùi thì chờ timestamp đã lưu, không tua ngược/tick trùng.
 
-Mỗi batch tối đa 100 quantum (10 giây thực), dừng sau quantum nếu ngân sách đo được đạt 8ms. Đây là giới hạn mềm, không ngắt quantum đang chạy. Snapshot và timestamp được ghi cùng record sau batch. `blockConcurrencyWhile` tuần tự hóa cả request, mutation và alarm qua await; alarm lặp lại/request đồng thời không tiến cùng khoảng thời gian hai lần. Revision tăng qua từng batch/điều khiển; generation chỉ tăng khi quản trị reset. Schema không hỗ trợ gây lỗi, không tự khởi tạo lại dữ liệu.
+Mỗi batch tối đa 100 quantum (10 giây thực), dừng sau quantum nếu ngân sách đo được đạt 8ms × speed (tối đa 80ms). Đây là giới hạn mềm, không ngắt quantum đang chạy. Snapshot và timestamp được ghi cùng record sau batch. `blockConcurrencyWhile` tuần tự hóa request, mutation và alarm qua await; không tiến cùng khoảng thời gian hai lần. Revision tăng qua từng batch/điều khiển; generation chỉ tăng khi người dùng reset. Trạng thái recovering phản ánh backlog tới timestamp đầu batch, không tính nhầm thời gian I/O thành recovery. Schema không hỗ trợ gây lỗi, không tự khởi tạo lại dữ liệu.
 
 WebSocket dùng Hibernation API. Khi có người xem, alarm mỗi 500ms phát snapshot (~2Hz), tránh ghi 30 lần/giây. Không còn người xem và backlog đã hết thì dừng alarm. Kết nối lại sẽ chạy bù từng bước theo timestamp, không bỏ sự kiện hoặc cắt bỏ offline dài. Đây là **khôi phục logic**, không phải CPU thực thi từng giây khi object ngủ. Nghỉ nhiều ngày có thể cần nhiều batch; UI báo số giây thực còn phải khôi phục và quản trị nhận 409 cho đến khi bắt kịp. Restart tiếp tục từ batch đã commit, giữ thứ tự random transition. Persisted record tồn tại thì không tạo lại 100 tế bào.
 
-Client nhận state ban đầu, bỏ revision cũ, reconnect backoff 0,5–30 giây kèm jitter và resync. Canvas vẽ bằng requestAnimationFrame và nội suy vị trí giữa các snapshot đã nhận, độ trễ hiển thị thêm khoảng một chu kỳ snapshot (~500ms). Không chạy engine hoặc đoán vị trí tương lai trên client. Food/counters/death lấy từ snapshot mới nhất; pause/reset/recovery hiển thị ngay không nội suy. Chọn cell dùng vị trí đang vẽ. Frame loop dừng khi đã đến vị trí cuối, không còn chuyển động hoặc tab bị ẩn. Watchdog đóng socket không nhận snapshot trong 15 giây. Tối đa 100 socket/world. Socket chỉ nhận dữ liệu; gửi message sẽ bị đóng. Admin qua REST có token, payload <= 2KiB, validation và tối đa 1 mutation/250ms toàn world. Đây là giới hạn ứng dụng, không phải hệ thống chống DDoS.
+Client nhận state ban đầu, bỏ revision cũ, reconnect backoff 0,5–30 giây kèm jitter và resync. Canvas vẽ bằng requestAnimationFrame và nội suy vị trí giữa các snapshot đã nhận, độ trễ hiển thị thêm khoảng một chu kỳ snapshot (~500ms). Không chạy engine hoặc đoán vị trí tương lai trên client. Food/counters/death lấy từ snapshot mới nhất; pause/reset/recovery hiển thị ngay không nội suy. Chọn cell dùng vị trí đang vẽ. Frame loop dừng khi đã đến vị trí cuối, không còn chuyển động hoặc tab bị ẩn. Watchdog đóng socket không nhận snapshot trong 15 giây. Tối đa 100 socket/world. Socket chỉ nhận dữ liệu; gửi message sẽ bị đóng.
 
-## Cloudflare, endpoints và secrets
+`POST /api/controls` công khai cho toàn bộ lệnh hợp lệ: speed, rate, pause, step, reset, food. Payload <= 2KiB, validate phía server, CORS origin cụ thể và giới hạn toàn world 1 lệnh/250ms. Khi gặp 429 hoặc recovery 409 tạm thời, client thử lại tối đa 8 lần cách 350ms; yêu cầu mới cùng loại hủy retry cũ. Slider không bị snapshot ghi đè trong lúc kéo. Không còn endpoint /api/admin hoặc cấu hình xác thực ứng dụng. Đây là giới hạn ứng dụng, không phải chống DDoS.
+
+## Cloudflare và endpoints
 
 `wrangler.jsonc` khai báo Worker, binding WORLD và migration `v1/new_sqlite_classes`. Giữ nguyên Worker name, class, migration cũ và canonical ID khi cập nhật để giữ namespace/dữ liệu.
 
-Frontend đọc public `window.CELLWORLD_API` từ `config.js`; build tạo file này từ biến môi trường `CELLWORLD_API` (HTTP/HTTPS origin, không secret). Nếu hosting chưa cấu hình thì trang báo thiếu backend, không âm thầm tạo mô phỏng local. Localhost mặc định cổng 8787. WebSocket đổi `https → wss`, path `/ws`; REST dùng `/api/state`, `/api/admin`.
+`durable_objects.code_update_strategy.mode` đặt `immediate` để object đang chạy nhận code mới cùng đợt deploy, trước khi frontend dùng endpoint mới. Runtime có thể khởi động lại và socket reconnect, nhưng constructor đọc lại SQLite, không reset world. Nếu dùng mặc định deferred, Worker mới có thể gọi object còn chạy code cũ tối đa 300 giây; từng gặp HTTP 405 với endpoint mới dù upload thành công. Tham khảo [code update strategy của Cloudflare](https://developers.cloudflare.com/durable-objects/deployments/durable-objects-code-updates/).
 
-`ALLOWED_ORIGINS` là danh sách origin chính xác phân cách dấu phẩy: mặc định `https://cellworld.pages.dev`, `http://127.0.0.1:5173`, `http://localhost:5173`. Không wildcard. Preview deployment URL phải được thêm chính xác nếu muốn sử dụng. Có thể bỏ localhost khỏi production. CORS hỗ trợ Authorization/Content-Type, `Vary: Origin`; state không cache. CLI không có Origin vẫn phải có token cho admin.
+Frontend đọc public `window.CELLWORLD_API` từ `config.js`; build tạo file này từ biến môi trường `CELLWORLD_API` (HTTP/HTTPS origin, không secret). Nếu hosting chưa cấu hình thì trang báo thiếu backend, không âm thầm tạo mô phỏng local. Localhost mặc định cổng 8787. WebSocket đổi `https → wss`, path `/ws`; REST dùng `/api/state`, `/api/controls`.
 
-Sau khi đủ quyền và được phê duyệt thay đổi production, cấu hình secret:
-
-```powershell
-npx wrangler secret put ADMIN_TOKEN
-```
-
-Nhập token ngẫu nhiên dài ít nhất 32 byte. Không commit token, không đặt trong frontend, `deployment.local.json` hay `CELLWORLD_API`. Lệnh secret cũng thay đổi production, chỉ chạy trong đợt được phê duyệt.
+`ALLOWED_ORIGINS` là danh sách origin chính xác phân cách dấu phẩy: mặc định `https://cellworld.pages.dev`, `http://127.0.0.1:5173`, `http://localhost:5173`. Không wildcard. Preview deployment URL phải được thêm chính xác nếu muốn sử dụng. Có thể bỏ localhost khỏi production. CORS hỗ trợ Content-Type, `Vary: Origin`; state không cache. Quyền đăng nhập Cloudflare để deploy vẫn thuộc chủ tài khoản, độc lập với các điều khiển công khai trên web.
 
 ## Deploy bằng PowerShell
 
@@ -115,7 +105,7 @@ Thêm origin `https://dangminhtai.github.io` vào ALLOWED_ORIGINS và deploy Wor
 
 ## Kiểm chứng F5 và nhiều trình duyệt
 
-`npm test` mở hai Chromium page, quản trị test pause thế giới, so sánh cells/time, F5, reconnect và chọn tế bào ở viewport 390px. Integration tắt/tạo mới workerd cùng SQLite directory và so sánh state; seed timestamp offline một ngày qua RPC **chỉ có trong bundle test**, kiểm tra backlog và resume sau restart. RPC seed không có trong production.
+`npm test` mở hai Chromium page, dùng điều khiển công khai để pause/step/reset ở local, so sánh state, F5, reconnect và chọn tế bào ở viewport 390px. Integration tắt/tạo mới workerd cùng SQLite directory và so sánh state; seed timestamp offline một ngày qua RPC **chỉ có trong bundle test**, kiểm tra backlog và resume sau restart. RPC seed không có trong production.
 
 Sau production deployment mới chạy kiểm tra chỉ đọc:
 
@@ -123,7 +113,7 @@ Sau production deployment mới chạy kiểm tra chỉ đọc:
 npm run verify:production
 ```
 
-Script mở đúng production URL, F5, kiểm tra generation/IDs giữ nguyên, simulation time/food counters không giảm, tế bào chết không hồi sinh; browser thứ hai có cùng generation/IDs và khách không thể reset. Recovery quá lâu hoặc admin reset đồng thời có thể khiến kiểm tra dừng. Khi cần so sánh state tuyệt đối, quản trị chủ động pause, thử hai browser/F5 rồi resume. Không reset production để thử persistence. Đã chạy PASS sau deployment được phê duyệt; xem deployment.md.
+Script mở đúng production URL, F5, kiểm tra generation/IDs giữ nguyên, simulation time/food counters không giảm, tế bào chết không hồi sinh; browser thứ hai có cùng generation/IDs. Recovery quá lâu hoặc người khác reset đồng thời có thể khiến kiểm tra dừng. Khi cần so sánh state tuyệt đối, chủ động pause, thử hai browser/F5 rồi resume. Không reset production để thử persistence. Xem deployment.md cho bằng chứng từng lần triển khai.
 
 ## Quota, chi phí, phục hồi và rollback
 
