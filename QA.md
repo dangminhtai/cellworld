@@ -1,5 +1,11 @@
 # Kết quả kiểm chứng CELLWORLD
 
+## Hiện tại: bỏ quản trị theo yêu cầu người dùng
+
+Không còn token, phân quyền, nút đăng nhập, metadata adminConfigured hoặc endpoint /api/admin. Tất cả lệnh hợp lệ công khai qua /api/controls. Giữ server validation/CORS/throttle, shared persistence và xác nhận reset. Các mục quyền quản trị bên dưới là lịch sử đã bị yêu cầu mới thay thế.
+
+PASS local: 27/27 tests và typecheck. Browser thực hiện pause/step/reset không đăng nhập; API thực hiện thêm food, giữ settings qua SQLite restart; validation và CORS vẫn PASS. Reconnect test nay chờ socket mới thật và nhận mutation tiếp theo, sửa close reply dùng code 1000 hợp lệ. Catch-up dùng ngân sách 8ms × speed (tối đa 80ms), giữ 100 quantum/batch; readiness dùng backlog tới timestamp entry thay vì tính cả thời gian I/O, tránh khóa nút giả ở 10×. Không thay thuật toán sinh học hoặc reset world khi deploy.
+
 ## Quyền công khai: tốc độ và lượng thức ăn mới
 
 USER CONFIRMED: mọi người được chỉnh 1×/5×/10× và thanh thức ăn. Hai giá trị áp dụng cho thế giới chung, người gửi sau thay giá trị trước. Không mở pause/step/reset/thả thức ăn thủ công.

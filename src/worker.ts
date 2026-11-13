@@ -6,8 +6,8 @@ export default {
     const allowed=env.ALLOWED_ORIGINS.split(',').map(s=>s.trim());
     if(origin&&!allowed.includes(origin))return new Response('Origin denied',{status:403});
     const path=new URL(req.url).pathname;
-    if(!['/api/state','/api/admin','/api/controls','/ws'].includes(path))return new Response('Not found',{status:404});
-    if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':origin??allowed[0],'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type','Vary':'Origin'}});
+    if(!['/api/state','/api/controls','/ws'].includes(path))return new Response('Not found',{status:404});
+    if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':origin??allowed[0],'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type','Vary':'Origin'}});
     const res=await env.WORLD.get(env.WORLD.idFromName('canonical-world-v1')).fetch(req);
     if(res.status===101)return res;
     const result=new Response(res.body,res);

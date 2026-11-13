@@ -1,12 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
 import { advance, createWorld } from './simulation';
-import { action, isPublicControl } from './actions';
+import { action } from './actions';
 import type { Env, World } from './types';
 
 export class WorldObject extends DurableObject<Env> {
   private world!:World;
   private lastAction=0;
-  private lastPublicAction=0;
+  private recovering=false;
   constructor(ctx:DurableObjectState,env:Env){
     super(ctx,env);
     ctx.blockConcurrencyWhile(async()=>{
@@ -16,11 +16,13 @@ export class WorldObject extends DurableObject<Env> {
       if(!saved)await ctx.storage.put('world',this.world);
     });
   }
-  private snapshot(){return {type:'snapshot',world:this.world,recoveryMs:Math.max(0,Date.now()-this.world.wall),adminConfigured:!!this.env.ADMIN_TOKEN};}
+  private snapshot(){return {type:'snapshot',world:this.world,recoveryMs:Math.max(0,Date.now()-this.world.wall),recovering:this.recovering};}
   private broadcast(){const msg=JSON.stringify(this.snapshot());for(const ws of this.ctx.getWebSockets()){try{ws.send(msg)}catch{ws.close(1011,'Resync');}}}
   private async cycle(){
     const target=Date.now();
-    const remaining=advance(this.world,target,100,8);
+    // Keep the same CPU allowance per simulated second when users select 10x.
+    const remaining=advance(this.world,target,100,8*this.world.speed);
+    this.recovering=remaining>=100;
     await this.ctx.storage.put('world',this.world);
     if(this.ctx.getWebSockets().length || Date.now()-this.world.wall>=100)await this.ctx.storage.setAlarm(Date.now()+500);
     return remaining;
@@ -29,23 +31,16 @@ export class WorldObject extends DurableObject<Env> {
     // Serialize requests AND alarms across storage awaits, including mutations.
     return this.ctx.blockConcurrencyWhile(async()=>{
       const url=new URL(req.url);
-      if(url.pathname==='/api/admin'||url.pathname==='/api/controls'){
-        const publicControl=url.pathname==='/api/controls';
-        if(!publicControl){
-          if(!this.env.ADMIN_TOKEN || req.headers.get('Authorization')!==`Bearer ${this.env.ADMIN_TOKEN}`)return new Response('Unauthorized',{status:401});
-          if(req.method==='GET')return Response.json({authorized:true});
-        }
+      if(url.pathname==='/api/controls'){
         if(req.method!=='POST')return new Response('Method',{status:405});
-        const last=publicControl?this.lastPublicAction:this.lastAction;
-        if(Date.now()-last<250)return new Response('Rate limited',{status:429,headers:{'Retry-After':'1'}});
-        if(publicControl)this.lastPublicAction=Date.now();else this.lastAction=Date.now();
+        if(Date.now()-this.lastAction<250)return new Response('Rate limited',{status:429,headers:{'Retry-After':'1'}});
+        this.lastAction=Date.now();
         if(Number(req.headers.get('content-length'))>2048)return new Response('Too large',{status:413});
         const reader=req.body?.getReader();let raw='';let bytes=0;const decoder=new TextDecoder();
         if(reader)while(true){const chunk=await reader.read();if(chunk.done)break;bytes+=chunk.value.byteLength;if(bytes>2048){await reader.cancel();return new Response('Too large',{status:413});}raw+=decoder.decode(chunk.value,{stream:true});}
         raw+=decoder.decode();
         let value:unknown;
         try{value=JSON.parse(raw);}catch{return new Response('Invalid JSON',{status:400});}
-        if(publicControl&&!isPublicControl(value))return new Response('Only speed and food rate are public',{status:403});
         // Compare against the fixed entry timestamp, not a newer timestamp after
         // storage I/O; otherwise a completed quantum can spuriously become stale.
         const remaining=await this.cycle();
@@ -68,6 +63,6 @@ export class WorldObject extends DurableObject<Env> {
   }
   async alarm(){await this.ctx.blockConcurrencyWhile(async()=>{await this.cycle();this.broadcast();});}
   webSocketMessage(ws:WebSocket){ws.close(1008,'Read-only stream');}
-  webSocketClose(ws:WebSocket,code:number,reason:string){ws.close(code,reason);}
+  webSocketClose(ws:WebSocket){ws.close(1000,'Closed');}
   webSocketError(ws:WebSocket){ws.close(1011,'Reconnect');}
 }

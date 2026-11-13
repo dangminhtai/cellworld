@@ -1,5 +1,14 @@
 # CELLWORLD implementation log
 
+## Remove application administration
+
+- [x] User requested removing admin logic. Removed login/token/role checks, admin UI/config/endpoint; all actions now use public /api/controls.
+- [x] Keep shared state, simulation rules, CORS, action validation, payload bounds and mutation throttling. Reset still confirms its shared-world effect.
+- [x] Updated tests: 27/27 PASS and typecheck PASS. Reconnect tested with a real replacement socket; corrected close reply, scaled bounded catch-up CPU budget with speed and exposed actual recovering state to avoid false control locks.
+- [ ] Deploy existing backend/frontend and verify without resetting production.
+
+Earlier sections below are historical; the current all-public controls supersede their admin restrictions.
+
 ## Public speed and food-rate controls
 
 - [x] User requested anyone may use up to 10x speed and the food-spawn slider. These change the shared world; pause/step/reset/manual food stay admin-only.

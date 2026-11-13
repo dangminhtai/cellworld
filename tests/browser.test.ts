@@ -5,9 +5,9 @@ import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import {build} from 'esbuild';
 import {createServer} from 'vite';
 
-test('real browsers: shared world, F5, read-only controls, admin, reconnect and mobile selection',{timeout:60000},async()=>{
+test('real browsers: public controls, shared world, F5, reconnect, reset and mobile selection',{timeout:60000},async()=>{
  const bundle=await build({entryPoints:['src/worker.ts'],bundle:true,write:false,format:'esm',external:['cloudflare:workers']});
- const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:bundle.outputFiles[0].text,compatibilityDate:'2026-11-01',bindings:{ADMIN_TOKEN:'browser-test-token',ALLOWED_ORIGINS:'http://127.0.0.1:5199'},durableObjects:{WORLD:{className:'WorldObject',useSQLite:true}}}));
+ const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:bundle.outputFiles[0].text,compatibilityDate:'2026-11-01',bindings:{ALLOWED_ORIGINS:'http://127.0.0.1:5199'},durableObjects:{WORLD:{className:'WorldObject',useSQLite:true}}}));
  const backend=String(await mf.ready).replace(/\/$/,'');
  const vite=await createServer({server:{host:'127.0.0.1',port:5199,strictPort:true}});await vite.listen();
  const browser=await chromium.launch({headless:true});const errors:string[]=[];const controlResponses:string[]=[];
@@ -25,7 +25,8 @@ test('real browsers: shared world, F5, read-only controls, admin, reconnect and 
   const smoothAfter=await a.evaluate(()=>({draws:(window as any).canvasDraws,messages:(window as any).snapshotCount}));
   assert.ok(smoothAfter.draws-smoothBefore.draws>20,'moving canvas must render between network messages');
   assert.ok(smoothAfter.draws-smoothBefore.draws>(smoothAfter.messages-smoothBefore.messages)*5,'smooth rendering must not require more snapshots');
-  assert.equal(await a.locator('#pause').isDisabled(),true);assert.equal(await b.locator('#reset').isDisabled(),true);
+  assert.equal(await a.locator('#pause').isDisabled(),false);assert.equal(await b.locator('#reset').isDisabled(),false);assert.equal(await a.locator('#admin').count(),0);
+  await a.locator('#pause').click();await a.waitForFunction(()=>document.querySelector('#pause')?.textContent?.includes('Tiếp tục'));await b.waitForFunction(()=>document.querySelector('#pause')?.textContent?.includes('Tiếp tục'));
   assert.equal(await a.locator('.speed[data-speed="10"]').isDisabled(),false);assert.equal(await b.locator('#rate').isDisabled(),false);
   await b.locator('.speed[data-speed="10"]').click();
   for(const page of [a,b])await page.waitForFunction(()=>document.querySelector('.speed[data-speed="10"]')?.classList.contains('active'));
@@ -33,18 +34,19 @@ test('real browsers: shared world, F5, read-only controls, admin, reconnect and 
   for(const page of [a,b])await page.waitForFunction(()=>document.querySelector('#rateLabel')?.textContent==='200%',{},{timeout:10000}).catch(e=>{throw Error(`${e.message}; requests: ${controlResponses.join('; ')}`);});
   await b.reload();await b.waitForFunction(()=>document.querySelector('#network')?.textContent==='Đã kết nối');
   await b.waitForFunction(()=>document.querySelector('.speed[data-speed="10"]')?.classList.contains('active')&&document.querySelector('#rateLabel')?.textContent==='200%');
-  assert.equal(await b.locator('#reset').isDisabled(),true);
-  a.once('dialog',d=>d.accept('browser-test-token'));await a.locator('#admin').click();await a.waitForFunction(()=>!(document.querySelector('#pause') as HTMLButtonElement).disabled);
-  await a.locator('#pause').click();await a.waitForFunction(()=>document.querySelector('#pause')?.textContent?.includes('Tiếp tục'));await b.waitForFunction(()=>document.querySelector('#pause')?.textContent?.includes('Tiếp tục'));
+  assert.equal(await b.locator('#reset').isDisabled(),false);
   const state=()=>a.evaluate(()=>JSON.parse(JSON.stringify((globalThis as any).eval('world'))));
   const paused=await state();assert.equal(paused.running,false);
   const other=await b.evaluate(()=>JSON.parse(JSON.stringify((globalThis as any).eval('world'))));assert.deepEqual(paused.cells,other.cells);assert.equal(paused.t,other.t);
-  await a.reload();await a.waitForFunction(()=>document.querySelector('#network')?.textContent==='Đã kết nối');const refreshed=await state();assert.deepEqual(refreshed.cells,paused.cells);assert.equal(refreshed.t,paused.t);assert.equal(refreshed.generation,paused.generation);assert.equal(await a.locator('#reset').isDisabled(),true);
+  await a.reload();await a.waitForFunction(()=>document.querySelector('#network')?.textContent==='Đã kết nối');const refreshed=await state();assert.deepEqual(refreshed.cells,paused.cells);assert.equal(refreshed.t,paused.t);assert.equal(refreshed.generation,paused.generation);assert.equal(await a.locator('#reset').isDisabled(),false);
   // Select a visible cell using canonical coordinates scaled into a narrow canvas.
   const c=paused.cells.find((c:any)=>c.alive);const rect=await b.locator('canvas').boundingBox();assert.ok(rect);
   await b.mouse.click(rect.x+c.x/900*rect.width,rect.y+c.y/585*rect.height);assert.match(await b.locator('#inspect').innerText(),/Tế bào #/);
   // Terminate the actual socket; exponential reconnect must resynchronize.
-  await a.evaluate(()=>{(globalThis as any).eval('socket.close()');});await a.waitForFunction(()=>document.querySelector('#network')?.textContent==='Đã kết nối');assert.equal((await state()).t,paused.t);
+  await a.evaluate(()=>{(globalThis as any).eval('globalThis.closedSocket=socket;socket.close(1000)');});await a.waitForFunction(()=>globalThis.eval('socket!==globalThis.closedSocket && socket.readyState===1')&&document.querySelector('#network')?.textContent==='Đã kết nối');assert.equal((await state()).t,paused.t);
+  await b.locator('#step').click();await a.waitForFunction(old=>(globalThis as any).eval('world.t')>old,paused.t,{timeout:5000}).catch(async e=>{throw Error(`${e.message}; before=${paused.t}; A=${await a.evaluate(()=>globalThis.eval('JSON.stringify({t:world.t,revision,ready:socket.readyState})'))}; B=${await b.evaluate(()=>globalThis.eval('JSON.stringify({t:world.t,revision,ready:socket.readyState})'))}; requests: ${controlResponses.join('; ')}`);});
+  a.once('dialog',d=>d.accept());await a.locator('#reset').click();
+  await b.waitForFunction(old=>(globalThis as any).eval('world.generation')===old+1,paused.generation);
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await vite.close();await mf.dispose();}
 });

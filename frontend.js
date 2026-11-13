@@ -1,10 +1,10 @@
 "use strict";
 const $=id=>document.getElementById(id),canvas=$("canvas"),ctx=canvas.getContext("2d");
 const W=900,H=585,N=100;
-let cells=[],foods=[],selected=null,selectedId=null,t=0,world=null,authorized=false,token='',socket,attempt=0,lastMessage=0,recoveryMs=Infinity;
+let cells=[],foods=[],selected=null,selectedId=null,t=0,world=null,socket,attempt=0,lastMessage=0,recoveryMs=Infinity;
 let revision=-1;
-let editingRate=false;
-const publicCommandVersion={speed:0,rate:0};
+let editingRate=false,recovering=true;
+const commandVersion={};
 const renderBuffer=new CellworldRenderBuffer();
 let renderedCells=[],animationFrame=null;
 function scheduleDraw(){
@@ -23,26 +23,21 @@ const status=$("network"),sync=$("sync");
 const local=['localhost','127.0.0.1'].includes(location.hostname);
 const endpoint=window.CELLWORLD_API || (local?'http://127.0.0.1:8787':'');
 function controls(){
-const connected=socket?.readyState===WebSocket.OPEN&&recoveryMs<100;
-const enabled=authorized&&connected;
-document.querySelectorAll('.controls button,.controls input').forEach(b=>b.disabled=!enabled);
-document.querySelectorAll('.speed,#rate').forEach(b=>b.disabled=!connected);
-$("step").disabled=!enabled||world?.running;
-$("admin").textContent=authorized?'Khóa quản trị':'Mở quản trị';
+const connected=socket?.readyState===WebSocket.OPEN&&!recovering;
+document.querySelectorAll('.controls button,.controls input').forEach(b=>b.disabled=!connected);
+$("step").disabled=!connected||world?.running;
 if(world){$("pause").textContent=world.running?'⏸ Tạm dừng':'▶ Tiếp tục';if(!editingRate){$("rate").value=world.rate*100;$("rateLabel").textContent=Math.round(world.rate*100)+'%';}document.querySelectorAll('.speed').forEach(b=>b.classList.toggle('active',Number(b.dataset.speed)===world.speed));}
 }
 async function command(value){
-const publicControl=['speed','rate'].includes(value.type);
-if(!publicControl&&!authorized)return false;
-const version=publicControl?++publicCommandVersion[value.type]:0;
-const send=()=>fetch(endpoint+(publicControl?'/api/controls':'/api/admin'),{method:'POST',headers:{'Content-Type':'application/json',...(!publicControl?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(value)});
+const version=commandVersion[value.type]=(commandVersion[value.type]||0)+1;
+const send=()=>fetch(endpoint+'/api/controls',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});
 try{let res=await send();
-for(let retry=0;publicControl&&[429,409].includes(res.status)&&retry<8;retry++){
+for(let retry=0;[429,409].includes(res.status)&&retry<8;retry++){
 await res.text();await new Promise(resolve=>setTimeout(resolve,350));
-if(version!==publicCommandVersion[value.type])return false;
+if(version!==commandVersion[value.type])return false;
 res=await send();
 }
-if(!res.ok){if(res.status===401){authorized=false;token='';controls();}throw Error(await res.text());}
+if(!res.ok)throw Error(await res.text());
 return true;
 }catch(e){sync.textContent='Lệnh thất bại: '+e.message;return false;}
 }
@@ -54,8 +49,8 @@ socket.onmessage=e=>{try{const data=JSON.parse(e.data);if(data.type!=='snapshot'
 lastMessage=Date.now();attempt=0;status.textContent='Đã kết nối';
 if(data.world.revision<revision)return;
 revision=data.world.revision;world=data.world;cells=world.cells;foods=world.foods;t=world.t;selected=cells.find(c=>c.id===selectedId)||null;
-recoveryMs=data.recoveryMs;sync.textContent=recoveryMs>=100?'Đang khôi phục: còn '+(recoveryMs/1000).toFixed(1)+' giây thực':'Đã đồng bộ · revision '+revision+' · mọi người được chỉnh tốc độ và thức ăn'+(data.adminConfigured?'':' · quản trị chưa cấu hình');
-renderBuffer.push(world,performance.now(),recoveryMs);
+recoveryMs=data.recoveryMs;recovering=data.recovering??(recoveryMs>=100);sync.textContent=recovering?'Đang khôi phục: còn '+(recoveryMs/1000).toFixed(1)+' giây thực':'Đã đồng bộ · revision '+revision+' · mọi người cùng điều khiển thế giới';
+renderBuffer.push(world,performance.now(),recovering?Math.max(100,recoveryMs):0);
 controls();update();scheduleDraw();}catch{sync.textContent='Dữ liệu không hợp lệ';socket.close();}};
 socket.onclose=()=>{status.textContent='Mất kết nối · đang thử lại';controls();setTimeout(connect,Math.min(30000,500*2**Math.min(attempt++,6))+Math.random()*300);};
 socket.onerror=()=>socket.close();
@@ -89,11 +84,6 @@ $("clock").textContent=String(Math.floor(t/60)).padStart(2,"0")+":"+String(Math.
 if(selected)$("inspect").textContent="Tế bào #"+selected.id+" | "+(selected.alive?"Còn sống":"Đã chết")+" | Ăn "+selected.eaten+" hạt | Bán kính 90px"+(selected.alive?"":" | Chết ở hạt thứ 101");
 }
 
-$("admin").onclick=async()=>{
-if(authorized){authorized=false;token='';controls();return;}
-const entered=prompt('Nhập admin token (chỉ giữ trong bộ nhớ tab, không lưu):');if(!entered)return;
-try{const r=await fetch(endpoint+'/api/admin',{headers:{Authorization:'Bearer '+entered}});if(!r.ok)throw Error('Không được cấp quyền hoặc chưa cấu hình ADMIN_TOKEN');token=entered;authorized=true;controls();}catch(e){sync.textContent=e.message;}
-};
 $("pause").onclick=()=>command({type:'pause',running:!world.running});
 $("step").onclick=()=>command({type:'step'});
 $("reset").onclick=()=>{if(confirm('Tạo lại thế giới chung cho TẤT CẢ người xem?'))command({type:'reset'});};
@@ -108,7 +98,7 @@ const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clien
 let near=null,best=400;
 for(const c of renderedCells){if(!c.alive)continue;const d=(c.x-x)**2+(c.y-y)**2;if(d<best){near=c;best=d;}}
 selectedId=near?.id??null;selected=cells.find(c=>c.id===selectedId)||null;
-if(!near){$("inspect").textContent=authorized?'Đang gửi yêu cầu thêm thức ăn.':'Chạm một tế bào để xem. Khách không thể thêm thức ăn.';command({type:'food',x,y});}
+if(!near){$("inspect").textContent='Đang gửi yêu cầu thêm thức ăn.';command({type:'food',x,y});}
 scheduleDraw();update();
 });
 controls();scheduleDraw();connect();
