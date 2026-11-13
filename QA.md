@@ -2,6 +2,8 @@
 
 Phạm vi: local Windows PowerShell, Node 22.16, Wrangler 4.161.0, workerd/Miniflare SQLite và Chromium. Không deploy production. Baseline: `d0d6f8e`.
 
+Lượt kiểm tra cuối: `npm test` **21/21 PASS**, `npm run typecheck` PASS, `npm run build` PASS; Wrangler dry-run PASS. Implementation commit `3bcab2a`; PR: https://github.com/dangminhtai/cellworld/pull/1 (chưa merge).
+
 | Hạng mục | Expected | Actual / bằng chứng | Kết quả |
 |---|---|---|---|
 | Luật sinh học | Giữ thuật toán và thứ tự random gốc | So toàn bộ engine sau 1.800 ticks với fixture gốc: cells/food/seed/clock/counters khớp | PASS |
