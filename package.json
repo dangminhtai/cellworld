@@ -1,0 +1,27 @@
+{
+  "name": "cellworld",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.mjs",
+    "verify:production": "node scripts/verify-production.mjs",
+    "deploy:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy.ps1 -Component backend",
+    "deploy:frontend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy.ps1 -Component frontend",
+    "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy.ps1 -Component all"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "@playwright/test": "^1.65.0",
+    "@types/node": "latest",
+    "esbuild": "^0.28.2",
+    "miniflare": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "wrangler": "latest"
+  }
+}

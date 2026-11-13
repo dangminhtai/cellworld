@@ -12,7 +12,7 @@
 <p class="note">100 tế bào · Di chuyển random · Bán kính cảm nhận 90px · Chỉ chết ở lần ăn thứ 101</p>
 <div class="layout">
 <section>
-<div class="scene"><canvas id="canvas" width="900" height="585" aria-label="Thế giới tế bào chuyển động"></canvas><div class="hint">Chạm tế bào để quan sát • Chạm vùng trống để thả thêm thức ăn</div></div>
+<div class="scene"><canvas id="canvas" width="900" height="585" aria-label="Thế giới tế bào chuyển động"></canvas><div class="hint">Chạm tế bào để quan sát • Quản trị viên có thể chạm vùng trống để thả thức ăn</div></div>
 <div class="controls">
 <button id="pause" class="primary">⏸ Tạm dừng</button>
 <button id="step" disabled>+ 1 giây</button>
@@ -26,111 +26,19 @@
 </section>
 <aside>
 <div class="panel"><h2>THỐNG KÊ</h2><div class="grid">
-<div class="metric"><small>Còn sống</small><strong id="alive">100</strong></div>
-<div class="metric"><small>Đã chết</small><strong id="dead">0</strong></div>
-<div class="metric"><small>Thức ăn</small><strong id="foods">180</strong></div>
-<div class="metric"><small>Đã ăn TB</small><strong id="average">0</strong></div>
+<div class="metric"><small>Còn sống</small><strong id="alive">—</strong></div>
+<div class="metric"><small>Đã chết</small><strong id="dead">—</strong></div>
+<div class="metric"><small>Thức ăn</small><strong id="foods">—</strong></div>
+<div class="metric"><small>Đã ăn TB</small><strong id="average">—</strong></div>
 </div><p class="time">Thời gian: <span id="clock">00:00</span></p></div>
 <div class="panel"><h2>QUAN SÁT</h2><div id="inspect" class="detail">Chạm một tế bào để xem số lần ăn.</div></div>
 <div class="panel"><h2>LUẬT HIỆN TẠI</h2><div class="detail">Bắt đầu 100 tế bào, không sinh sản.<br>Không thấy thức ăn: đi hướng ngẫu nhiên, đổi hướng sau 1,5 đến 5,5 giây.<br>Thấy thức ăn trong 90px: di chuyển về phía nó.<br>Chết khi ăn hạt thứ 101.<br>Không chết vì tuổi già, đói hay hết năng lượng.</div></div>
 </aside>
 </div>
-<footer>CELLWORLD v1.1 · Chạy độc lập trong trình duyệt, không cần backend.</footer>
+<p class="time" role="status"><span id="network">Đang chờ</span> · <span id="sync">Chưa đồng bộ</span></p>
+<button id="admin">Mở quản trị</button>
+<footer>CELLWORLD v2 · Thế giới chung lưu bền vững trên Cloudflare. Khách mặc định chỉ xem.</footer>
 </main>
-<script>
-(()=>{
-"use strict";
-const $=id=>document.getElementById(id),canvas=$("canvas"),ctx=canvas.getContext("2d");
-const W=900,H=585,N=100,MAXFOODS=700;
-let seed=2026,cells=[],foods=[],selected=null,t=0,running=true,speed=1,rate=1,debt=0,lag=0,previous=0,uiDelay=0;
-const random=(a=0,b=1)=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return a+(b-a)*seed/4294967296};
-const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
-const makeFood=(x=random(8,W-8),y=random(8,H-8))=>({x,y});
-const distance=(a,b)=>(a.x-b.x)**2+(a.y-b.y)**2;
-function reset(){
-seed=2026;t=0;debt=0;lag=0;speed=1;rate=1;running=true;selected=null;
-cells=Array.from({length:N},(_,i)=>({id:i+1,x:random(10,W-10),y:random(10,H-10),direction:random(-Math.PI,Math.PI),velocity:random(18,33),turnIn:random(1.5,5.5),target:null,eaten:0,alive:true,flash:0}));
-foods=Array.from({length:180},()=>makeFood());
-$("pause").textContent="⏸ Tạm dừng";$("step").disabled=true;$("rate").value="100";$("rateLabel").textContent="100%";
-document.querySelectorAll(".speed").forEach(b=>b.classList.toggle("active",Number(b.dataset.speed)===1));
-$("inspect").textContent="Chạm một tế bào để xem số lần ăn.";update();
-}
-function tick(dt){
-t+=dt;debt+=5*rate*dt;
-while(debt>=1){if(foods.length<MAXFOODS)foods.push(makeFood());debt--}
-for(const c of cells){
-if(!c.alive)continue;
-c.flash=Math.max(0,c.flash-dt);
-let index=-1,best=90*90;
-if(c.target){let i=foods.indexOf(c.target);if(i>=0&&distance(c,foods[i])<=best){index=i;best=distance(c,foods[i])}else c.target=null}
-if(index===-1){for(let i=0;i<foods.length;i++){let d=distance(c,foods[i]);if(d<best){best=d;index=i}}}
-if(index>=0){
-const f=foods[index];c.target=f;
-if(best<49){
-foods.splice(index,1);c.target=null;c.eaten++;c.flash=.5;
-if(c.eaten>100){c.alive=false;continue}
-}else{
-let desired=Math.atan2(f.y-c.y,f.x-c.x);
-let delta=Math.atan2(Math.sin(desired-c.direction),Math.cos(desired-c.direction));
-c.direction+=clamp(delta,-3.3*dt,3.3*dt);
-}
-}else{
-c.target=null;c.turnIn-=dt;
-if(c.turnIn<=0){c.direction=random(-Math.PI,Math.PI);c.turnIn=random(1.5,5.5)}
-}
-c.x+=Math.cos(c.direction)*c.velocity*dt;c.y+=Math.sin(c.direction)*c.velocity*dt;
-if(c.x<6||c.x>W-6){c.x=clamp(c.x,6,W-6);c.direction=Math.PI-c.direction}
-if(c.y<6||c.y>H-6){c.y=clamp(c.y,6,H-6);c.direction=-c.direction}
-}
-}
-function draw(){
-ctx.fillStyle="#0c252b";ctx.fillRect(0,0,W,H);
-ctx.strokeStyle="rgba(129,222,186,.07)";ctx.beginPath();
-for(let x=0;x<W;x+=45){ctx.moveTo(x,0);ctx.lineTo(x,H)}
-for(let y=0;y<H;y+=45){ctx.moveTo(0,y);ctx.lineTo(W,y)}ctx.stroke();
-ctx.fillStyle="#e2e9a2";for(const f of foods)ctx.fillRect(f.x-1.5,f.y-1.5,3,3);
-for(const c of cells){
-if(!c.alive)continue;
-ctx.fillStyle=c.flash>0?"#f7eb8e":c.eaten>=90?"#eb8585":c.eaten>=60?"#f3be83":"#81e2c5";
-ctx.globalAlpha=.16;ctx.beginPath();ctx.arc(c.x,c.y,9,0,Math.PI*2);ctx.fill();
-ctx.globalAlpha=1;ctx.beginPath();ctx.arc(c.x,c.y,4,0,Math.PI*2);ctx.fill();
-}
-if(selected){
-ctx.strokeStyle=selected.alive?"#c7f59d":"#e78585";ctx.lineWidth=1.4;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(selected.x,selected.y,90,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
-ctx.beginPath();ctx.arc(selected.x,selected.y,12,0,Math.PI*2);ctx.stroke();
-ctx.fillStyle="#eafdd2";ctx.font="14px monospace";ctx.fillText("C-"+selected.id,selected.x+15,selected.y-10);
-}
-}
-function update(){
-const alive=cells.filter(c=>c.alive);
-$("alive").textContent=alive.length;$("dead").textContent=N-alive.length;$("foods").textContent=foods.length;
-$("average").textContent=alive.length?(alive.reduce((n,c)=>n+c.eaten,0)/alive.length).toFixed(1):"0";
-$("clock").textContent=String(Math.floor(t/60)).padStart(2,"0")+":"+String(Math.floor(t)%60).padStart(2,"0");
-if(selected)$("inspect").textContent="Tế bào #"+selected.id+" | "+(selected.alive?"Còn sống":"Đã chết")+" | Ăn "+selected.eaten+" hạt | Bán kính 90px"+(selected.alive?"":" | Chết ở hạt thứ 101");
-}
-function frame(now){
-let dt=Math.min(.06,(now-previous)/1000||0);previous=now;
-if(running){lag=Math.min(.7,lag+dt*speed);let i=0;while(lag>=1/30&&i<40){tick(1/30);lag-=1/30;i++}}
-draw();uiDelay+=dt;if(uiDelay>.12){update();uiDelay=0}
-requestAnimationFrame(frame);
-}
-$("pause").onclick=()=>{running=!running;$("pause").textContent=running?"⏸ Tạm dừng":"▶ Tiếp tục";$("step").disabled=running;update()};
-$("step").onclick=()=>{if(running)return;for(let i=0;i<30;i++)tick(1/30);draw();update()};
-$("reset").onclick=reset;
-$("rate").oninput=e=>{rate=Number(e.target.value)/100;$("rateLabel").textContent=e.target.value+"%"};
-document.querySelectorAll(".speed").forEach(b=>b.onclick=()=>{speed=Number(b.dataset.speed);document.querySelectorAll(".speed").forEach(x=>x.classList.toggle("active",x===b))});
-canvas.addEventListener("pointerdown",e=>{
-const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
-let near=null,best=20*20;
-for(const c of cells){if(!c.alive)continue;let d=(c.x-x)**2+(c.y-y)**2;if(d<best){near=c;best=d}}
-if(near)selected=near;
-else{
-selected=null;
-for(let i=0;i<8&&foods.length<MAXFOODS;i++)foods.push(makeFood(clamp(x+random(-25,25),5,W-5),clamp(y+random(-25,25),5,H-5)));
-$("inspect").textContent="Đã thêm 8 hạt thức ăn tại vị trí vừa chạm.";
-}
-draw();update();
-});
-reset();requestAnimationFrame(frame);
-})();
-</script></body></html>
+<script src="./config.js"></script>
+<script src="./render-state.js"></script>
+<script src="./frontend.js"></script></body></html>

@@ -1,0 +1,6 @@
+{
+  "accountId": "COPY_VERIFIED_CLOUDFLARE_ACCOUNT_ID",
+  "backendUrl": "https://cellworld-backend.YOUR_SUBDOMAIN.workers.dev",
+  "pagesId": null,
+  "backendTag": null
+}
