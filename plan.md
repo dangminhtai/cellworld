@@ -5,7 +5,7 @@
 - [x] User requested removing admin logic. Removed login/token/role checks, admin UI/config/endpoint; all actions now use public /api/controls.
 - [x] Keep shared state, simulation rules, CORS, action validation, payload bounds and mutation throttling. Reset still confirms its shared-world effect.
 - [x] Updated tests: 27/27 PASS and typecheck PASS. Reconnect tested with a real replacement socket; corrected close reply, scaled bounded catch-up CPU budget with speed and exposed actual recovering state to avoid false control locks.
-- [ ] Deploy existing backend/frontend and verify without resetting production.
+- [x] Deploy source daf8c18: Worker f6183144-f437-4a43-aa65-6e94c104940a and Pages https://62cd394a.cellworld.pages.dev . Production all-controls/unlocked UI, public pause, speed/rate sync and F5 PASS. Test settings/running state restored; no production reset invoked.
 
 Earlier sections below are historical; the current all-public controls supersede their admin restrictions.
 

@@ -6,6 +6,8 @@ Không còn token, phân quyền, nút đăng nhập, metadata adminConfigured h
 
 PASS local: 27/27 tests và typecheck. Browser thực hiện pause/step/reset không đăng nhập; API thực hiện thêm food, giữ settings qua SQLite restart; validation và CORS vẫn PASS. Reconnect test nay chờ socket mới thật và nhận mutation tiếp theo, sửa close reply dùng code 1000 hợp lệ. Catch-up dùng ngân sách 8ms × speed (tối đa 80ms), giữ 100 quantum/batch; readiness dùng backlog tới timestamp entry thay vì tính cả thời gian I/O, tránh khóa nút giả ở 10×. Không thay thuật toán sinh học hoặc reset world khi deploy.
 
+PASS production sau deployment 62cd394a / Worker f6183144-f437-4a43-aa65-6e94c104940a: không còn nút quản trị, pause/reset mở; live pause đồng bộ hai browser, speed/rate giữ qua F5; observation-only F5/IDs/counters PASS. Test không gọi reset production. Sửa payload cleanup của live probe dùng running cho pause rồi chạy lại exit 0, khôi phục đúng trạng thái chạy và speed/rate trước thử.
+
 ## Quyền công khai: tốc độ và lượng thức ăn mới
 
 USER CONFIRMED: mọi người được chỉnh 1×/5×/10× và thanh thức ăn. Hai giá trị áp dụng cho thế giới chung, người gửi sau thay giá trị trước. Không mở pause/step/reset/thả thức ăn thủ công.

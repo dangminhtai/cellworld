@@ -5,7 +5,7 @@ const backend='https://cellworld-backend.dmt826321.workers.dev';
 const get=async()=>{const r=await fetch(backend+'/api/state');assert.equal(r.status,200);return (await r.json()).world;};
 const change=async(type,value)=>{
   for(let i=0;i<16;i++){
-    const r=await fetch(backend+'/api/controls',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://cellworld.pages.dev'},body:JSON.stringify({type,value})});
+    const r=await fetch(backend+'/api/controls',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://cellworld.pages.dev'},body:JSON.stringify({type,...(type==='pause'?{running:value}:{value})})});
     if(r.ok)return;
     if(![409,429].includes(r.status))throw Error(`Control ${type}: ${r.status} ${await r.text()}`);
     await new Promise(resolve=>setTimeout(resolve,400));
