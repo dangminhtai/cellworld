@@ -85,7 +85,7 @@ ctx.fillStyle="#eafdd2";ctx.font="14px monospace";ctx.fillText("C-"+focus.id,foc
 }
 function update(){
 const alive=cells.filter(c=>c.alive);
-$("alive").textContent=alive.length;$("dead").textContent=cells.length-alive.length;$("foods").textContent=foods.length;
+$("alive").textContent=alive.length;$("dead").textContent=world?.deadCount??(cells.length-alive.length);$("foods").textContent=foods.length;
 $("average").textContent=alive.length?(alive.reduce((n,c)=>n+c.eaten,0)/alive.length).toFixed(1):"0";
 $("clock").textContent=String(Math.floor(t/60)).padStart(2,"0")+":"+String(Math.floor(t)%60).padStart(2,"0");
 if(selected)$("inspect").textContent="Tế bào #"+selected.id+" | "+(selected.alive?"Còn sống":"Đã chết")+" | Ăn "+selected.eaten+" hạt | Bán kính 90px"+(selected.alive?"":"");

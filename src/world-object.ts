@@ -17,8 +17,11 @@ export class WorldObject extends DurableObject<Env> {
       if(!saved)await ctx.storage.put('world',this.world);
     });
   }
-  private snapshot(){return {type:'snapshot',world:this.world,recoveryMs:Math.max(0,Date.now()-this.world.wall),recovering:this.recovering};}
-  private broadcast(){const msg=JSON.stringify(this.snapshot());for(const ws of this.ctx.getWebSockets()){try{ws.send(msg)}catch{ws.close(1011,'Resync');}}}
+  private snapshot(compact=false){
+    const world=this.world;
+    const cells=compact?world.cells.filter(c=>c.alive||c.id<=100):world.cells;
+    return {type:'snapshot',world:compact?{...world,cells,contacts:undefined,deadCount:world.cells.length-world.cells.filter(c=>c.alive).length}:world,recoveryMs:Math.max(0,Date.now()-this.world.wall),recovering:this.recovering};}
+  private broadcast(){const msg=JSON.stringify(this.snapshot(true));for(const ws of this.ctx.getWebSockets()){try{ws.send(msg)}catch{ws.close(1011,'Resync');}}}
   private async cycle(){
     const target=Date.now();
     ensureMonster(this.world);
@@ -58,11 +61,11 @@ export class WorldObject extends DurableObject<Env> {
         if(req.headers.get('Upgrade')?.toLowerCase()!=='websocket')return new Response('WebSocket required',{status:426});
         if(this.ctx.getWebSockets().length>=100)return new Response('World full',{status:503});
         const pair=new WebSocketPair();this.ctx.acceptWebSocket(pair[1]);
-        pair[1].send(JSON.stringify(this.snapshot()));
+        pair[1].send(JSON.stringify(this.snapshot(true)));
         await this.ctx.storage.setAlarm(Date.now()+500);
         return new Response(null,{status:101,webSocket:pair[0]});
       }
-      return Response.json(this.snapshot(),{headers:{'Cache-Control':'no-store'}});
+      return Response.json(this.snapshot(true),{headers:{'Cache-Control':'no-store'}});
     });
   }
   async alarm(){await this.ctx.blockConcurrencyWhile(async()=>{await this.cycle();this.broadcast();});}
