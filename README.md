@@ -2,6 +2,8 @@
 
 Thế giới chung 100 tế bào: frontend HTML/CSS/Canvas trên **Cloudflare Pages**, backend Worker `cellworld-backend` chứa một **SQLite-backed Durable Object**. Giữ giao diện và luật cũ; GitHub Pages vẫn có thể phục vụ frontend với cùng backend.
 
+Production đã triển khai sau phê duyệt: **https://cellworld.pages.dev/**. Backend: https://cellworld-backend.dmt826321.workers.dev . F5 và hai trang production đã kiểm tra PASS; xem [deployment.md](deployment.md) và [QA.md](QA.md) cho phạm vi bằng chứng. Chưa đặt ADMIN_TOKEN nên hiện mặc định chỉ xem.
+
 ## Luật gốc
 
 Thế giới cố định 900 × 585, ban đầu 100 tế bào và 180 hạt. Không sinh sản. Không thấy thức ăn thì đi thẳng, đổi hướng sau 1,5–5,5 giây mô phỏng; cảm nhận trong 90px. Tìm mục tiêu mới dùng `< 90²`, giữ mục tiêu cũ dùng `<= 90²`, đúng code gốc. Vận tốc 18–33px/s, tốc độ quay 3,3rad/s, phản xạ ở biên. Ăn khi khoảng cách `< 7px`, mỗi hạt chỉ ăn một lần. Sống qua lần ăn 100, chết ở lần 101; không có nguyên nhân chết khác. Thức ăn tự sinh 5 hạt/giây × hệ số 0–2, tối đa 700 hạt; thao tác thủ công thêm tối đa 8 hạt.
@@ -121,7 +123,7 @@ Sau production deployment mới chạy kiểm tra chỉ đọc:
 npm run verify:production
 ```
 
-Script mở đúng production URL, F5, kiểm tra generation/IDs giữ nguyên, simulation time/food counters không giảm, tế bào chết không hồi sinh; browser thứ hai có cùng generation/IDs và khách không thể reset. Recovery quá lâu hoặc admin reset đồng thời có thể khiến kiểm tra dừng. Khi cần so sánh state tuyệt đối, quản trị chủ động pause, thử hai browser/F5 rồi resume. Không reset production để thử persistence. Production F5 chưa được kiểm chứng trong lần triển khai code ban đầu vì chưa phê duyệt deploy.
+Script mở đúng production URL, F5, kiểm tra generation/IDs giữ nguyên, simulation time/food counters không giảm, tế bào chết không hồi sinh; browser thứ hai có cùng generation/IDs và khách không thể reset. Recovery quá lâu hoặc admin reset đồng thời có thể khiến kiểm tra dừng. Khi cần so sánh state tuyệt đối, quản trị chủ động pause, thử hai browser/F5 rồi resume. Không reset production để thử persistence. Đã chạy PASS sau deployment được phê duyệt; xem deployment.md.
 
 ## Quota, chi phí, phục hồi và rollback
 
