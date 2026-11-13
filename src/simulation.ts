@@ -21,7 +21,7 @@ function separate(c:Cell, cells:Cell[]){
  }
 }
 
-function move(c:Cell,cells:Cell[],dt:number){
+function move(c:Cell,cells:Cell[],dt:number,onContact:(other:Cell)=>void){
  const margin=Math.max(6,radius(c));
  const nextX=c.x+Math.cos(c.direction)*c.velocity*dt;
  const nextY=c.y+Math.sin(c.direction)*c.velocity*dt;
@@ -33,6 +33,7 @@ function move(c:Cell,cells:Cell[],dt:number){
   return;
  }
  let stop=1;
+ let blocker:Cell|undefined;
  let predatorAt=Infinity;
  const prey:{cell:Cell;at:number}[]=[];
  for(const other of cells){
@@ -47,11 +48,12 @@ function move(c:Cell,cells:Cell[],dt:number){
   if(at>1)continue;
   if(radius(c)>radius(other))prey.push({cell:other,at});
   else if(radius(c)<radius(other))predatorAt=Math.min(predatorAt,at);
-  else stop=Math.min(stop,Math.max(0,at-1e-8));
+  else if(at-1e-8<stop){stop=Math.max(0,at-1e-8);blocker=other;}
  }
  if(predatorAt<=stop){c.alive=false;stop=predatorAt;}
  for(const hit of prey)if(hit.at<=stop)hit.cell.alive=false;
  c.x+=dx*stop;c.y+=dy*stop;
+ if(blocker&&c.alive)onContact(blocker);
  if(stop<1){c.direction+=Math.PI;return true;}
  else {
   if(nextX<margin||nextX>W-margin)c.direction=Math.PI-c.direction;
@@ -63,16 +65,40 @@ export function rand(s:World,a=0,b=1){s.seed=(Math.imul(s.seed,1664525)+10139042
 export function food(s:World,x=rand(s,8,W-8),y=rand(s,8,H-8)):Food{return {id:s.nextFood++,x,y}}
 export function createWorld(now:number):World {
 const s:World={schema:1,seed:2026,cells:[],foods:[],nextFood:1,t:0,debt:0,running:true,speed:1,rate:1,wall:now,revision:0,generation:0};
-s.cells=Array.from({length:N},(_,i)=>({id:i+1,x:rand(s,10,W-10),y:rand(s,10,H-10),direction:rand(s,-Math.PI,Math.PI),velocity:rand(s,18,33),turnIn:rand(s,1.5,5.5),target:null,eaten:0,alive:true,flash:0}));
+s.cells=Array.from({length:N},(_,i)=>({id:i+1,sex:i%2===0?"male":"female",x:rand(s,10,W-10),y:rand(s,10,H-10),direction:rand(s,-Math.PI,Math.PI),velocity:rand(s,18,33),turnIn:rand(s,1.5,5.5),target:null,eaten:0,alive:true,flash:0}));
 for(const c of s.cells)separate(c,s.cells);
 return s;
 }
+function reproduce(s:World,a:Cell,b:Cell){
+ if(!a.alive||!b.alive||sex(a)===sex(b))return;
+ const dead=s.cells.filter(c=>!c.alive).length;
+ if(s.cells.length-dead>=100-Math.floor(dead/5)||rand(s)>=0.5)return;
+ const x=(a.x+b.x)/2,y=(a.y+b.y)/2;
+ for(let angle=0;angle<8;angle++){
+  const px=clamp(x+20*Math.cos(angle*Math.PI/4),6,W-6);
+  const py=clamp(y+20*Math.sin(angle*Math.PI/4),6,H-6);
+  if(s.cells.some(c=>c.alive&&distance(c,{x:px,y:py})<(radius(c)+4)**2))continue;
+  s.cells.push({id:s.cells.at(-1)!.id+1,sex:rand(s)<0.5?'male':'female',x:px,y:py,
+   direction:rand(s,-Math.PI,Math.PI),velocity:rand(s,18,33),turnIn:rand(s,1.5,5.5),
+   target:null,eaten:0,alive:true,flash:0});
+  return;
+ }
+}
+
+const sex=(c:Cell)=>c.sex??(c.id%2?'male':'female');
+
 export function tick(s: World, dt = 1/30){
 let {cells, foods, rate, debt, t} = s;
 const random=(a=0,b=1)=>rand(s,a,b);
 const makeFood=()=>food(s);
 t+=dt;debt+=5*rate*dt;
 while(debt>=1){if(foods.length<MAXFOODS)foods.push(makeFood());debt--}
+const contacts=s.contacts??={};
+for(const [key,[a,b]] of Object.entries(contacts)){
+ const first=cells[a-1],second=cells[b-1];
+ if(!first?.alive||!second?.alive||distance(first,second)>(radius(first)+radius(second)+0.001)**2)delete contacts[key];
+}
+const encounters:[Cell,Cell][]=[];
 for(const c of cells){
 if(!c.alive)continue;
 c.flash=Math.max(0,c.flash-dt);
@@ -97,12 +123,19 @@ if(!avoiding) c.target=null;c.turnIn-=dt;
 if(!avoiding && c.turnIn<=0){c.direction=random(-Math.PI,Math.PI);c.turnIn=random(1.5,5.5)}
 }
 separate(c,cells);
-if(move(c,cells,dt) && c.alive){
+if(move(c,cells,dt,other=>{
+ const a=Math.min(c.id,other.id),b=Math.max(c.id,other.id),key=a+':'+b;
+ if(sex(c)!==sex(other)&&!contacts[key]){
+  contacts[key]=[a,b];
+  encounters.push([c,other]);
+ }
+}) && c.alive){
  c.target=null;
  c.direction+=random(-Math.PI/4,Math.PI/4);
  c.avoidUntil=t+random(0.5,1);
 }
 }
+for(const [a,b] of encounters)reproduce(s,a,b);
 s.t=t;s.debt=debt;
 }
 

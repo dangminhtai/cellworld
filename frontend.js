@@ -1,6 +1,6 @@
 "use strict";
 const $=id=>document.getElementById(id),canvas=$("canvas"),ctx=canvas.getContext("2d");
-const W=900,H=585,N=100;
+const W=900,H=585;
 let cells=[],foods=[],selected=null,selectedId=null,t=0,world=null,socket,attempt=0,lastMessage=0,recoveryMs=Infinity;
 let revision=-1;
 let editingRate=false,recovering=true;
@@ -65,6 +65,11 @@ if(!c.alive)continue;
 const radius=c.eaten>=60?10:c.eaten>=20?5:4;
 ctx.fillStyle=c.eaten>=60?"#eb6868":c.eaten>=20?"#f7eb8e":"#81e2a0";
 ctx.beginPath();ctx.arc(c.x,c.y,radius,0,Math.PI*2);ctx.fill();
+ctx.fillStyle=ctx.strokeStyle="#12343c";
+ctx.beginPath();
+const male=(c.sex??(c.id%2?"male":"female"))==="male";
+ctx.arc(c.x,c.y,radius*(male ? .25 : .43),0,Math.PI*2);
+if(male)ctx.fill();else{ctx.lineWidth=1;ctx.stroke();}
 }
 const focus=renderedCells.find(c=>c.id===selectedId);
 if(focus){
@@ -75,7 +80,7 @@ ctx.fillStyle="#eafdd2";ctx.font="14px monospace";ctx.fillText("C-"+focus.id,foc
 }
 function update(){
 const alive=cells.filter(c=>c.alive);
-$("alive").textContent=alive.length;$("dead").textContent=N-alive.length;$("foods").textContent=foods.length;
+$("alive").textContent=alive.length;$("dead").textContent=cells.length-alive.length;$("foods").textContent=foods.length;
 $("average").textContent=alive.length?(alive.reduce((n,c)=>n+c.eaten,0)/alive.length).toFixed(1):"0";
 $("clock").textContent=String(Math.floor(t/60)).padStart(2,"0")+":"+String(Math.floor(t)%60).padStart(2,"0");
 if(selected)$("inspect").textContent="Tế bào #"+selected.id+" | "+(selected.alive?"Còn sống":"Đã chết")+" | Ăn "+selected.eaten+" hạt | Bán kính 90px"+(selected.alive?"":"");

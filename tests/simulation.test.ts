@@ -70,3 +70,19 @@ test('blocked cells drop their food target and move away before searching again'
  assert.ok(c.x<x);
  assert.equal(c.target,null);
 });
+test('fresh contact can produce one child and the declining cap blocks replacement',()=>{
+ for(const deaths of [1,5]){
+  const s=createWorld(0);
+  const [a,b]=s.cells;
+  Object.assign(a,{x:100,y:100,direction:0,velocity:30,turnIn:3});
+  Object.assign(b,{x:108,y:100,velocity:0,turnIn:3});
+  s.cells.slice(2).forEach((c,i)=>Object.assign(c,{x:250+(i%10)*50,y:50+Math.floor(i/10)*50,velocity:0,alive:i>=deaths}));
+  s.seed=1;s.rate=0;
+  // Keep the living population one below 100 in both scenarios.
+  if(deaths===5)for(let i=0;i<4;i++)s.cells.push({...s.cells[7+i],id:101+i,y:570});
+  tick(s);
+  assert.equal(s.cells.filter(c=>c.alive).length,deaths===1?100:99);
+  assert.equal(s.cells.length,deaths===1?101:104);
+  if(deaths===1)assert.ok(s.cells.at(-1)?.sex);
+ }
+});

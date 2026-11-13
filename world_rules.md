@@ -10,3 +10,4 @@
 5. Tế bào không được chồng lên nhau hoặc đi xuyên qua nhau.
 6. Tế bào lớn hơn ăn được tế bào nhỏ hơn.
 7. Tế bào tìm thức ăn trong bán kính 90 pixel. Khi bị chặn, nó đổi hướng để né rồi tìm lại.
+8. Khi một cặp đực–cái vừa chạm nhau, có 50% cơ hội sinh một tế bào mới nếu còn chỗ. Con mới có 50% là đực, 50% là cái. Trần dân số bắt đầu ở 100 và giảm 1 sau mỗi 5 tế bào chết.
