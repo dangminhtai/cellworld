@@ -3,6 +3,20 @@ const $=id=>document.getElementById(id),canvas=$("canvas"),ctx=canvas.getContext
 const W=900,H=585,N=100;
 let cells=[],foods=[],selected=null,selectedId=null,t=0,world=null,authorized=false,token='',socket,attempt=0,lastMessage=0,recoveryMs=Infinity;
 let revision=-1;
+const renderBuffer=new CellworldRenderBuffer();
+let renderedCells=[],animationFrame=null;
+function scheduleDraw(){
+if(animationFrame!==null||document.hidden)return;
+animationFrame=requestAnimationFrame(renderFrame);
+}
+function renderFrame(now){
+animationFrame=null;renderedCells=renderBuffer.sample(now);draw();
+if(renderBuffer.moving)scheduleDraw();
+}
+document.addEventListener('visibilitychange',()=>{
+if(document.hidden){if(animationFrame!==null)cancelAnimationFrame(animationFrame);animationFrame=null;}
+else scheduleDraw();
+});
 const status=$("network"),sync=$("sync");
 const local=['localhost','127.0.0.1'].includes(location.hostname);
 const endpoint=window.CELLWORLD_API || (local?'http://127.0.0.1:8787':'');
@@ -28,7 +42,8 @@ lastMessage=Date.now();attempt=0;status.textContent='Đã kết nối';
 if(data.world.revision<revision)return;
 revision=data.world.revision;world=data.world;cells=world.cells;foods=world.foods;t=world.t;selected=cells.find(c=>c.id===selectedId)||null;
 recoveryMs=data.recoveryMs;sync.textContent=recoveryMs>=100?'Đang khôi phục: còn '+(recoveryMs/1000).toFixed(1)+' giây thực':'Đã đồng bộ · revision '+revision+(data.adminConfigured?' · khách chỉ xem':' · quản trị chưa cấu hình');
-controls();update();draw();}catch{sync.textContent='Dữ liệu không hợp lệ';socket.close();}};
+renderBuffer.push(world,performance.now(),recoveryMs);
+controls();update();scheduleDraw();}catch{sync.textContent='Dữ liệu không hợp lệ';socket.close();}};
 socket.onclose=()=>{status.textContent='Mất kết nối · đang thử lại';controls();setTimeout(connect,Math.min(30000,500*2**Math.min(attempt++,6))+Math.random()*300);};
 socket.onerror=()=>socket.close();
 }catch(e){status.textContent='Backend URL không hợp lệ';sync.textContent=e.message;}
@@ -40,16 +55,17 @@ ctx.strokeStyle="rgba(129,222,186,.07)";ctx.beginPath();
 for(let x=0;x<W;x+=45){ctx.moveTo(x,0);ctx.lineTo(x,H)}
 for(let y=0;y<H;y+=45){ctx.moveTo(0,y);ctx.lineTo(W,y)}ctx.stroke();
 ctx.fillStyle="#e2e9a2";for(const f of foods)ctx.fillRect(f.x-1.5,f.y-1.5,3,3);
-for(const c of cells){
+for(const c of renderedCells){
 if(!c.alive)continue;
 ctx.fillStyle=c.flash>0?"#f7eb8e":c.eaten>=90?"#eb8585":c.eaten>=60?"#f3be83":"#81e2c5";
 ctx.globalAlpha=.16;ctx.beginPath();ctx.arc(c.x,c.y,9,0,Math.PI*2);ctx.fill();
 ctx.globalAlpha=1;ctx.beginPath();ctx.arc(c.x,c.y,4,0,Math.PI*2);ctx.fill();
 }
-if(selected){
-ctx.strokeStyle=selected.alive?"#c7f59d":"#e78585";ctx.lineWidth=1.4;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(selected.x,selected.y,90,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
-ctx.beginPath();ctx.arc(selected.x,selected.y,12,0,Math.PI*2);ctx.stroke();
-ctx.fillStyle="#eafdd2";ctx.font="14px monospace";ctx.fillText("C-"+selected.id,selected.x+15,selected.y-10);
+const focus=renderedCells.find(c=>c.id===selectedId);
+if(focus){
+ctx.strokeStyle=focus.alive?"#c7f59d":"#e78585";ctx.lineWidth=1.4;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(focus.x,focus.y,90,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+ctx.beginPath();ctx.arc(focus.x,focus.y,12,0,Math.PI*2);ctx.stroke();
+ctx.fillStyle="#eafdd2";ctx.font="14px monospace";ctx.fillText("C-"+focus.id,focus.x+15,focus.y-10);
 }
 }
 function update(){
@@ -73,9 +89,9 @@ document.querySelectorAll('.speed').forEach(b=>b.onclick=()=>command({type:'spee
 canvas.addEventListener('pointerdown',e=>{
 const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
 let near=null,best=400;
-for(const c of cells){if(!c.alive)continue;const d=(c.x-x)**2+(c.y-y)**2;if(d<best){near=c;best=d;}}
-selected=near;selectedId=near?.id??null;
+for(const c of renderedCells){if(!c.alive)continue;const d=(c.x-x)**2+(c.y-y)**2;if(d<best){near=c;best=d;}}
+selectedId=near?.id??null;selected=cells.find(c=>c.id===selectedId)||null;
 if(!near){$("inspect").textContent=authorized?'Đang gửi yêu cầu thêm thức ăn.':'Chạm một tế bào để xem. Khách không thể thêm thức ăn.';command({type:'food',x,y});}
-draw();update();
+scheduleDraw();update();
 });
-controls();draw();connect();
+controls();scheduleDraw();connect();

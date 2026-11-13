@@ -13,7 +13,18 @@ test('real browsers: shared world, F5, read-only controls, admin, reconnect and 
  const browser=await chromium.launch({headless:true});const errors:string[]=[];
  try{
   const a=await browser.newPage(),b=await browser.newPage({viewport:{width:390,height:844}});
-  for(const page of [a,b]){page.on('pageerror',e=>errors.push(e.message));await page.addInitScript(url=>{(window as any).testBackend=url;},backend);await page.route('**/config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.CELLWORLD_API=${JSON.stringify(backend)};`}));await page.goto('http://127.0.0.1:5199/');await page.waitForFunction(()=>document.querySelector('#network')?.textContent==='Đã kết nối');}
+  for(const page of [a,b]){page.on('pageerror',e=>errors.push(e.message));await page.addInitScript(url=>{
+   (window as any).testBackend=url;(window as any).canvasDraws=0;(window as any).snapshotCount=0;
+   const fill=CanvasRenderingContext2D.prototype.fillRect;
+   CanvasRenderingContext2D.prototype.fillRect=function(x,y,w,h){if(w===900&&h===585)(window as any).canvasDraws++;return fill.call(this,x,y,w,h);};
+   const Native=window.WebSocket;window.WebSocket=class extends Native{constructor(url:string){super(url);this.addEventListener('message',()=>{(window as any).snapshotCount++;});}};
+  },backend);await page.route('**/config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.CELLWORLD_API=${JSON.stringify(backend)};`}));await page.goto('http://127.0.0.1:5199/');await page.waitForFunction(()=>document.querySelector('#network')?.textContent==='Đã kết nối');}
+  await a.waitForFunction(()=>(window as any).snapshotCount>=3);
+  const smoothBefore=await a.evaluate(()=>({draws:(window as any).canvasDraws,messages:(window as any).snapshotCount}));
+  await a.waitForTimeout(1200);
+  const smoothAfter=await a.evaluate(()=>({draws:(window as any).canvasDraws,messages:(window as any).snapshotCount}));
+  assert.ok(smoothAfter.draws-smoothBefore.draws>20,'moving canvas must render between network messages');
+  assert.ok(smoothAfter.draws-smoothBefore.draws>(smoothAfter.messages-smoothBefore.messages)*5,'smooth rendering must not require more snapshots');
   assert.equal(await a.locator('#pause').isDisabled(),true);assert.equal(await b.locator('#reset').isDisabled(),true);
   a.once('dialog',d=>d.accept('browser-test-token'));await a.locator('#admin').click();await a.waitForFunction(()=>!(document.querySelector('#pause') as HTMLButtonElement).disabled);
   await a.locator('#pause').click();await a.waitForFunction(()=>document.querySelector('#pause')?.textContent?.includes('Tiếp tục'));await b.waitForFunction(()=>document.querySelector('#pause')?.textContent?.includes('Tiếp tục'));

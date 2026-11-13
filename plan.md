@@ -1,5 +1,14 @@
 # CELLWORLD implementation log
 
+## Rendering performance follow-up
+
+- [x] Profile production read-only for 8 seconds: 16 draws / 16 snapshots (1.995 draws/s), median snapshot gap 500.1ms, maximum 505.9ms, ~39.6KB/s, no long tasks, 100 alive cells. Canvas only drew on WebSocket messages.
+- [x] Implement client-only interpolation + requestAnimationFrame; preserve all authoritative rules/state. Pause/reset/recovery snap; stop frame loop when settled or hidden.
+- [x] Verify rendering, immutable authoritative state, F5/shared state, typecheck and build: 26/26 tests PASS. Local frontend + the same production backend produced 452 draws / 16 snapshots in 8.01s (~56.4 draws/s), no long tasks or browser errors.
+- [ ] Commit/push and deploy frontend-only remediation within the user-approved CELLWORLD deployment scope. Keep Worker, database and canonical world unchanged; verify production after deploy.
+
+## Initial implementation
+
 - [x] Inspect clean main, original simulation and adjacent choicungnhau workflow.
 - [x] Create feat/persistent-realtime-world.
 - [x] Extract deterministic rules; implement canonical durable state and authenticated actions.

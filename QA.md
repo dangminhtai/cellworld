@@ -1,5 +1,15 @@
 # Kết quả kiểm chứng CELLWORLD
 
+## Sửa giật chuyển động
+
+P1: người dùng thấy tế bào giật. Tái hiện: mở production khi world chạy; Canvas chỉ vẽ lúc WebSocket gửi snapshot. Expected: chuyển động theo nhịp màn hình, server vẫn ~2 snapshot/s. Actual trước sửa: 16 lần vẽ / 16 snapshot trong 8,02 giây (~1,995 draw/s); khoảng cách snapshot median 500,1ms/max 505,9ms; ~39,6KB/s; không long task hoặc browser error trong probe.
+
+Fix: render-state.js giữ bản sao trình bày, nội suy các vị trí đã nhận, requestAnimationFrame vẽ độc lập mạng. Không extrapolate/tự tick; giữ nguyên backend, database và luật. Pause/reset/recovery snap ngay, dead không hồi sinh, revision cũ bị bỏ, chọn theo vị trí đang vẽ, tab ẩn hoặc vị trí không đổi không duy trì loop.
+
+PASS local: 26/26 automated tests, typecheck và build. Browser test xác nhận >20 lần vẽ trong 1,2 giây khi vẫn nhận snapshot ~2Hz; F5/shared-world/reconnect/admin vẫn PASS. Cùng backend production, frontend local sau sửa đo 452 draw / 16 snapshot trong 8,01 giây (~56,4 draw/s), median gap 501,1ms/max 506,6ms, không long task/browser error. Đây là draw cadence trên Chromium headless, không phải benchmark mọi thiết bị/GPU hoặc database. Probe chỉ đọc, không gửi admin actions. Script tái lập: node scripts/profile-render.mjs; PROFILE_URL chọn frontend, PROFILE_BACKEND tùy chọn cấu hình Worker cho frontend local.
+
+## Triển khai ban đầu
+
 Phạm vi: Windows PowerShell, Node 22.16, Wrangler 4.161.0, workerd/Miniflare SQLite và Chromium; bổ sung deployment và smoke production sau khi người dùng phê duyệt. Baseline: `d0d6f8e`.
 
 Lượt kiểm tra cuối: `npm test` **21/21 PASS**, `npm run typecheck` PASS, `npm run build` PASS; Wrangler dry-run PASS. Implementation commit `3bcab2a`; PR: https://github.com/dangminhtai/cellworld/pull/1 (chưa merge).
