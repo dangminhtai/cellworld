@@ -9,3 +9,4 @@
    - Ăn từ 60 cái: đỏ.
 5. Tế bào không được chồng lên nhau hoặc đi xuyên qua nhau.
 6. Tế bào lớn hơn ăn được tế bào nhỏ hơn.
+7. Tế bào tìm thức ăn trong bán kính 90 pixel. Khi bị chặn, nó đổi hướng để né rồi tìm lại.

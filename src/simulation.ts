@@ -52,7 +52,7 @@ function move(c:Cell,cells:Cell[],dt:number){
  if(predatorAt<=stop){c.alive=false;stop=predatorAt;}
  for(const hit of prey)if(hit.at<=stop)hit.cell.alive=false;
  c.x+=dx*stop;c.y+=dy*stop;
- if(stop<1)c.direction+=Math.PI;
+ if(stop<1){c.direction+=Math.PI;return true;}
  else {
   if(nextX<margin||nextX>W-margin)c.direction=Math.PI-c.direction;
   if(nextY<margin||nextY>H-margin)c.direction=-c.direction;
@@ -76,9 +76,10 @@ while(debt>=1){if(foods.length<MAXFOODS)foods.push(makeFood());debt--}
 for(const c of cells){
 if(!c.alive)continue;
 c.flash=Math.max(0,c.flash-dt);
+const avoiding=(c.avoidUntil??0)>t;
 let index=-1,best=90*90;
-if(c.target !== null){let i=foods.findIndex(f=>f.id===c.target);if(i>=0&&distance(c,foods[i])<=best){index=i;best=distance(c,foods[i])}else c.target=null}
-if(index===-1){for(let i=0;i<foods.length;i++){let d=distance(c,foods[i]);if(d<best){best=d;index=i}}}
+if(!avoiding && c.target !== null){let i=foods.findIndex(f=>f.id===c.target);if(i>=0&&distance(c,foods[i])<=best){index=i;best=distance(c,foods[i])}else c.target=null}
+if(!avoiding && index===-1){for(let i=0;i<foods.length;i++){let d=distance(c,foods[i]);if(d<best){best=d;index=i}}}
 if(index>=0){
 const f=foods[index];c.target=f.id;
 if(best<49){
@@ -92,11 +93,15 @@ let delta=Math.atan2(Math.sin(desired-c.direction),Math.cos(desired-c.direction)
 c.direction+=clamp(delta,-3.3*dt,3.3*dt);
 }
 }else{
-c.target=null;c.turnIn-=dt;
-if(c.turnIn<=0){c.direction=random(-Math.PI,Math.PI);c.turnIn=random(1.5,5.5)}
+if(!avoiding) c.target=null;c.turnIn-=dt;
+if(!avoiding && c.turnIn<=0){c.direction=random(-Math.PI,Math.PI);c.turnIn=random(1.5,5.5)}
 }
 separate(c,cells);
-move(c,cells,dt);
+if(move(c,cells,dt) && c.alive){
+ c.target=null;
+ c.direction+=random(-Math.PI/4,Math.PI/4);
+ c.avoidUntil=t+random(0.5,1);
+}
 }
 s.t=t;s.debt=debt;
 }

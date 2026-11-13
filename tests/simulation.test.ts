@@ -58,3 +58,15 @@ test('same-size cells block movement, and larger cells eat smaller cells on cont
  Object.assign(c,{x:450,direction:0,eaten:20});
  tick(s,1);assert.equal(other.alive,false);
 });
+test('blocked cells drop their food target and move away before searching again',()=>{
+ const s=isolated(),c=s.cells[0],other=s.cells[1];
+ Object.assign(other,{alive:true,x:458,y:290,velocity:0});
+ s.foods=[food(s,480,290)];
+ tick(s);
+ assert.equal(c.target,null);
+ assert.ok((c.avoidUntil??0)>s.t);
+ const x=c.x;
+ tick(s);
+ assert.ok(c.x<x);
+ assert.equal(c.target,null);
+});
