@@ -19,7 +19,8 @@ test('real browsers: public controls, shared world, F5, reconnect, reset and mob
    CanvasRenderingContext2D.prototype.fillRect=function(x,y,w,h){if(w===900&&h===585)(window as any).canvasDraws++;return fill.call(this,x,y,w,h);};
    const Native=window.WebSocket;window.WebSocket=class extends Native{constructor(url:string){super(url);this.addEventListener('message',()=>{(window as any).snapshotCount++;});}};
   },backend);await page.route('**/config.js',route=>route.fulfill({contentType:'application/javascript',body:`window.CELLWORLD_API=${JSON.stringify(backend)};`}));await page.goto('http://127.0.0.1:5199/');await page.waitForFunction(()=>document.querySelector('#network')?.textContent==='Đã kết nối');}
-  await a.waitForFunction(()=>(window as any).snapshotCount>=3);
+  await a.bringToFront();
+  await a.waitForFunction(()=>(window as any).snapshotCount>=3 && !document.hidden);
   const smoothBefore=await a.evaluate(()=>({draws:(window as any).canvasDraws,messages:(window as any).snapshotCount}));
   await a.waitForFunction(before=>{
    const draws=(window as any).canvasDraws-before.draws;
