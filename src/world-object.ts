@@ -33,11 +33,13 @@ export class WorldObject extends DurableObject<Env> {
     const target=Date.now();
     this.archiveDeaths();
     ensureMonster(this.world);
-    // Scale the catch-up allowance while bounding each alarm cycle.
-    const remaining=advance(this.world,target,100,Math.min(80,8*this.world.speed));
+    // Cloudflare timers are frozen during synchronous CPU work.
+    // Limit each event to 3,000 simulation steps, including at 100x.
+    const quanta=Math.max(1,Math.min(100,Math.floor(3000/(3*this.world.speed))));
+    const remaining=advance(this.world,target,quanta);
     this.recovering=remaining>=100;
     await this.ctx.storage.put('world',this.world);
-    if(this.ctx.getWebSockets().length || Date.now()-this.world.wall>=100)await this.ctx.storage.setAlarm(Date.now()+500);
+    if(this.ctx.getWebSockets().length || Date.now()-this.world.wall>=100)await this.ctx.storage.setAlarm(Math.max(Date.now()+1,target+1000));
     return remaining;
   }
   async fetch(req:Request){
@@ -70,7 +72,7 @@ export class WorldObject extends DurableObject<Env> {
         if(this.ctx.getWebSockets().length>=100)return new Response('World full',{status:503});
         const pair=new WebSocketPair();this.ctx.acceptWebSocket(pair[1]);
         pair[1].send(JSON.stringify(this.snapshot(true)));
-        await this.ctx.storage.setAlarm(Date.now()+500);
+        await this.ctx.storage.setAlarm(Date.now()+1000);
         return new Response(null,{status:101,webSocket:pair[0]});
       }
       return Response.json(this.snapshot(true),{headers:{'Cache-Control':'no-store'}});

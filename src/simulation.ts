@@ -4,12 +4,38 @@ export const clamp=(x:number,a:number,b:number)=>Math.min(b,Math.max(a,x));
 const distance=(a:{x:number;y:number},b:{x:number;y:number})=>(a.x-b.x)**2+(a.y-b.y)**2;
 const radius=(c:Cell)=>c.eaten>=60?10:c.eaten>=20?5:4;
 
-function separate(c:Cell, cells:Cell[]){
+// Broad phase only. Sorting preserves the original cell iteration order.
+class CellGrid {
+ private buckets = new Map<number, Set<Cell>>();
+ private keys = new Map<Cell, number>();
+ private key(x:number,y:number){return Math.floor(y/40)*32+Math.floor(x/40);}
+ constructor(cells:Cell[]){for(const c of cells)this.update(c);}
+ update(c:Cell){
+  const key=this.key(c.x,c.y),old=this.keys.get(c);
+  if(old===key)return;
+  if(old!==undefined)this.buckets.get(old)?.delete(c);
+  let bucket=this.buckets.get(key);
+  if(!bucket){bucket=new Set();this.buckets.set(key,bucket);}
+  bucket.add(c);this.keys.set(c,key);
+ }
+ near(x:number,y:number,r:number){
+  const result:Cell[]=[];
+  for(let row=Math.max(0,Math.floor((y-r)/40));row<=Math.floor((y+r)/40);row++){
+   for(let col=Math.max(0,Math.floor((x-r)/40));col<=Math.floor((x+r)/40);col++){
+    const bucket=this.buckets.get(row*32+col);
+    if(bucket)for(const c of bucket)result.push(c);
+   }
+  }
+  return result.sort((a,b)=>a.id-b.id);
+ }
+}
+
+function separate(c:Cell, cells:Cell[], grid?:CellGrid){
  const r=radius(c);
  const margin=Math.max(6,r);
  c.x=clamp(c.x,margin,W-margin);
  c.y=clamp(c.y,margin,H-margin);
- const fits=(x:number,y:number)=>cells.every(other=>other===c||!other.alive||
+ const fits=(x:number,y:number)=>(grid?grid.near(x,y,r+10):cells).every(other=>other===c||!other.alive||
   (x-other.x)**2+(y-other.y)**2>=(r+radius(other))**2);
  if(fits(c.x,c.y))return;
  for(let offset=1;offset<=40;offset++){
@@ -135,6 +161,7 @@ for(const [key,[a,b]] of Object.entries(contacts)){
  if(!first?.alive||!second?.alive||distance(first,second)>(radius(first)+radius(second)+0.001)**2)delete contacts[key];
 }
 const encounters:[Cell,Cell][]=[];
+const grid=new CellGrid(cells);
 for(const c of cells){
 if(!c.alive)continue;
 c.flash=Math.max(0,c.flash-dt);
@@ -154,7 +181,7 @@ if(best<Math.max(7,radius(c))**2){
 const previousRadius=radius(c);
 foods.splice(index,1);c.target=null;c.eaten++;c.flash=.5;
 if(c.eaten>100){c.alive=false;continue}
-if(radius(c)!==previousRadius)separate(c,cells);
+if(radius(c)!==previousRadius){separate(c,cells,grid);grid.update(c);}
 }else{
 let desired=Math.atan2(f.y-c.y,f.x-c.x);
 let delta=Math.atan2(Math.sin(desired-c.direction),Math.cos(desired-c.direction));
@@ -164,8 +191,8 @@ c.direction+=clamp(delta,-3.3*dt,3.3*dt);
 if(!avoiding) c.target=null;c.turnIn-=dt;
 if(!avoiding && c.turnIn<=0){c.direction=random(-Math.PI,Math.PI);c.turnIn=random(1.5,5.5)}
 }
-separate(c,cells);
-if(move(c,cells,dt,other=>{
+separate(c,cells,grid);
+if(move(c,grid.near(c.x,c.y,20+c.velocity*dt),dt,other=>{
  const a=Math.min(c.id,other.id),b=Math.max(c.id,other.id),key=a+':'+b;
  if(sex(c)!==sex(other)&&!contacts[key]){
   contacts[key]=[a,b];
@@ -176,6 +203,7 @@ if(move(c,cells,dt,other=>{
  c.direction+=random(-Math.PI/4,Math.PI/4);
  c.avoidUntil=t+random(0.5,1);
 }
+grid.update(c);
 }
 for(const [a,b] of encounters)reproduce(s,a,b);
 s.t=t;s.debt=debt;
