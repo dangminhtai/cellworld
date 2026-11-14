@@ -7,6 +7,25 @@ export class WorldObject extends DurableObject<Env> {
   private world!:World;
   private lastAction=0;
   private recovering=false;
+  private timer:ReturnType<typeof setTimeout>|null=null;
+  private lastSaved=0;
+
+  private scheduleLive(){
+    if(this.timer!==null||!this.ctx.getWebSockets().length)return;
+    this.timer=setTimeout(()=>{
+      this.timer=null;
+      this.ctx.waitUntil(this.ctx.blockConcurrencyWhile(async()=>{
+        if(this.ctx.getWebSockets().length){
+          await this.cycle(false);
+          this.broadcast();
+        }else{
+          await this.cycle();
+        }
+      }).catch(error=>console.error('Live cycle failed',error))
+        .finally(()=>this.scheduleLive()));
+    },100);
+  }
+
   constructor(ctx:DurableObjectState,env:Env){
     super(ctx,env);
     ctx.blockConcurrencyWhile(async()=>{
@@ -29,17 +48,25 @@ export class WorldObject extends DurableObject<Env> {
     world.archivedDeaths=(world.archivedDeaths??0)+world.cells.length-cells.length;
     world.cells=cells;
   }
-  private async cycle(){
+  private async cycle(forceSave=true){
     const target=Date.now();
     this.archiveDeaths();
     ensureMonster(this.world);
-    // Cloudflare timers are frozen during synchronous CPU work.
-    // Limit each event to 3,000 simulation steps, including at 100x.
-    const quanta=Math.max(1,Math.min(100,Math.floor(3000/(3*this.world.speed))));
+    // Bound CPU work by steps; Workers clocks are frozen during synchronous work.
+    const stepLimit=forceSave?3000:600;
+    const quanta=Math.max(1,Math.min(100,Math.floor(stepLimit/(3*this.world.speed))));
     const remaining=advance(this.world,target,quanta);
     this.recovering=remaining>=100;
-    await this.ctx.storage.put('world',this.world);
-    if(this.ctx.getWebSockets().length || Date.now()-this.world.wall>=100)await this.ctx.storage.setAlarm(Math.max(Date.now()+1,target+1000));
+    if(forceSave||target-this.lastSaved>=1000){
+      await this.ctx.storage.put('world',this.world);
+      this.lastSaved=target;
+      // While viewers are connected, this is a durable recovery watchdog.
+      // The in-memory timer delivers snapshots without an alarm per frame.
+      const delay=this.ctx.getWebSockets().length?30000:1000;
+      if(this.ctx.getWebSockets().length||Date.now()-this.world.wall>=100){
+        await this.ctx.storage.setAlarm(Date.now()+delay);
+      }
+    }
     return remaining;
   }
   async fetch(req:Request){
@@ -72,13 +99,14 @@ export class WorldObject extends DurableObject<Env> {
         if(this.ctx.getWebSockets().length>=100)return new Response('World full',{status:503});
         const pair=new WebSocketPair();this.ctx.acceptWebSocket(pair[1]);
         pair[1].send(JSON.stringify(this.snapshot(true)));
-        await this.ctx.storage.setAlarm(Date.now()+1000);
+        await this.ctx.storage.setAlarm(Date.now()+30000);
+        this.scheduleLive();
         return new Response(null,{status:101,webSocket:pair[0]});
       }
       return Response.json(this.snapshot(true),{headers:{'Cache-Control':'no-store'}});
     });
   }
-  async alarm(){await this.ctx.blockConcurrencyWhile(async()=>{await this.cycle();this.broadcast();});}
+  async alarm(){await this.ctx.blockConcurrencyWhile(async()=>{await this.cycle();this.broadcast();this.scheduleLive();});}
   webSocketMessage(ws:WebSocket){ws.close(1008,'Read-only stream');}
   webSocketClose(ws:WebSocket){ws.close(1000,'Closed');}
   webSocketError(ws:WebSocket){ws.close(1011,'Reconnect');}

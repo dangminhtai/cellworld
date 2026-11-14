@@ -71,8 +71,8 @@ const male=(c.sex??(c.id%2?"male":"female"))==="male";
 ctx.arc(c.x,c.y,radius*(male ? .25 : .43),0,Math.PI*2);
 if(male)ctx.fill();else{ctx.lineWidth=1;ctx.stroke();}
 }
-if(world?.monster){
- const m=world.monster;
+if(renderBuffer.monster){
+ const m=renderBuffer.monster;
  ctx.font="26px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
  ctx.fillText("👾",m.x,m.y);ctx.textAlign="start";ctx.textBaseline="alphabetic";
 }

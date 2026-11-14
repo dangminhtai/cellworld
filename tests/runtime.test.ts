@@ -27,6 +27,22 @@ test('workerd: all controls public, validation, CORS, shared state and durable r
    const denied=await mf.dispatchFetch('http://world/api/controls',{method:'POST',headers:{Origin:'https://evil.example'},body:'{"type":"reset"}'});assert.equal(denied.status,403);
    const preflight=await mf.dispatchFetch('http://world/api/controls',{method:'OPTIONS',headers:{Origin:'https://cellworld.pages.dev'}});assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),'https://cellworld.pages.dev');assert.equal((await get()).world.generation,0);
   });
+  await t.test('live timer streams snapshots and recovers monotonic revisions after restart',async()=>{
+   const response=await mf.dispatchFetch('http://world/ws',{headers:{Upgrade:'websocket'}});
+   assert.equal(response.status,101);
+   const snapshots:any[]=[];
+   response.webSocket!.addEventListener('message',(e:any)=>snapshots.push(JSON.parse(e.data)));
+   response.webSocket!.accept();
+   await sleep(1500);
+   assert.ok(snapshots.length>=6,'live snapshots should arrive more often than checkpoints');
+   const latest=snapshots.at(-1).world;
+   assert.ok(snapshots.every((s,i)=>i===0||s.world.revision>=snapshots[i-1].world.revision));
+   await mf.dispose();mf=new Miniflare(options);
+   const recovered=await get();
+   assert.ok(recovered.world.wall>=latest.wall);
+   assert.ok(recovered.world.revision>=latest.revision);
+   assert.equal(recovered.world.generation,latest.generation);
+  });
   assert.equal((await change({type:'pause',running:false})).status,200);const paused=await get();
   await t.test('two WebSockets and reconnect share exact paused state',async()=>{
    const responses=await Promise.all([1,2].map(()=>mf.dispatchFetch('http://world/ws',{headers:{Upgrade:'websocket'}})));

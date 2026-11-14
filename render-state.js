@@ -1,55 +1,67 @@
-// Presentation only: blend between received positions, never simulate or extrapolate.
-// Kept as a classic script so the buildless GitHub Pages frontend also works.
+// Only presentation positions are buffered. Simulation remains authoritative.
 globalThis.CellworldRenderBuffer = class {
   constructor() {
     this.cells = [];
-    this.from = new Map();
+    this.monster = null;
+    this.frames = [];
     this.revision = -1;
     this.generation = null;
-    this.receivedAt = 0;
-    this.duration = 500;
-    this.animating = false;
     this.wasRunning = false;
-    this.wasRecovering = false;
+    this.duration = 100;
+    this.animating = false;
   }
 
-  push(world, now, recoveryMs = 0) {
-    if (world.revision < this.revision) return false;
-    // A reconnect/duplicate publication must not restart a completed blend.
-    if (world.revision === this.revision) return false;
-    const visible = this.sample(now);
+  push(world, now) {
+    if (world.revision <= this.revision) return false;
+    const previous = this.frames.at(-1);
     const blend = this.generation === world.generation && this.wasRunning &&
-      world.running && !this.wasRecovering && recoveryMs < 100;
+      world.running && previous && now - previous.at < 2000;
     if (blend) {
-      const gap = now - this.receivedAt;
-      // Follow the observed publication cadence, with a bound after outages.
-      if (gap > 0) this.duration = Math.max(100, Math.min(1000, this.duration * .8 + gap * .2));
+      this.duration = Math.max(100, Math.min(500,
+        this.duration * .8 + (now - previous.at) * .2));
+    } else {
+      this.frames = [];
+      this.duration = 100;
     }
-    this.from = new Map(visible.map(c => [c.id, { x: c.x, y: c.y }]));
-    this.cells = world.cells.map(c => ({ ...c, targetX: c.x, targetY: c.y }));
+    this.cells = world.cells.map(c => ({ ...c }));
+    this.monster = world.monster ? { ...world.monster } : null;
+    this.frames.push({
+      at: now,
+      cells: new Map(world.cells.map(c => [c.id, { x: c.x, y: c.y }])),
+      monster: world.monster ? { x: world.monster.x, y: world.monster.y } : null
+    });
+    // A hidden tab or a burst of updates cannot grow the buffer without bound.
+    if (this.frames.length > 32) this.frames.shift();
     this.revision = world.revision;
     this.generation = world.generation;
     this.wasRunning = world.running;
-    this.wasRecovering = recoveryMs >= 100;
-    this.receivedAt = now;
-    this.animating = blend && this.cells.some(c => {
-      const start = this.from.get(c.id);
-      return c.alive && start && (start.x !== c.x || start.y !== c.y);
-    });
-    if (!blend) this.from.clear();
     this.sample(now);
     return true;
   }
 
   sample(now) {
-    const alpha = this.animating ? Math.max(0, Math.min(1, (now - this.receivedAt) / this.duration)) : 1;
-    for (const c of this.cells) {
-      const start = this.from.get(c.id);
-      // Death/counters/food remain those of the newest authoritative snapshot.
-      c.x = start && c.alive ? start.x + (c.targetX - start.x) * alpha : c.targetX;
-      c.y = start && c.alive ? start.y + (c.targetY - start.y) * alpha : c.targetY;
+    const renderTime = now - this.duration * 2;
+    while (this.frames.length > 2 && this.frames[1].at <= renderTime) {
+      this.frames.shift();
     }
-    if (alpha === 1) this.animating = false;
+    const first = this.frames[0];
+    const next = this.frames[1] || first;
+    if (!first) return this.cells;
+    const alpha = next.at > first.at
+      ? Math.max(0, Math.min(1, (renderTime - first.at) / (next.at - first.at))) : 1;
+    let changed = false;
+    const blend = (entity, start, end) => {
+      if (!entity || !start || !end) return;
+      changed ||= start.x !== end.x || start.y !== end.y;
+      entity.x = start.x + (end.x - start.x) * alpha;
+      entity.y = start.y + (end.y - start.y) * alpha;
+    };
+    for (const cell of this.cells) {
+      if (cell.alive) blend(cell, first.cells.get(cell.id), next.cells.get(cell.id));
+    }
+    blend(this.monster, first.monster, next.monster);
+    this.animating = this.wasRunning && (this.frames.length > 2 ||
+      (changed && renderTime < next.at));
     return this.cells;
   }
 

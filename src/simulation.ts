@@ -219,5 +219,5 @@ if(s.running)for(let i=0;i<3*s.speed;i++)tick(s);
 s.wall+=100;n++;
 if(performance.now()-start>=budgetMs)break;
 }
-if(n)s.revision++;return Math.max(0,now-s.wall);
+if(n)s.revision+=n;return Math.max(0,now-s.wall);
 }
